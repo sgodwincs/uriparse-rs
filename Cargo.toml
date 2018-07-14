@@ -1,0 +1,14 @@
+[package]
+authors = ["sgodw <sgodwincs@gmail.com>"]
+name = "uri"
+version = "0.1.0"
+
+[dependencies]
+lazy_static = "1.0.1"
+
+[dev-dependencies]
+criterion = "0.2.4"
+
+[[bench]]
+name = "parse"
+harness = false
