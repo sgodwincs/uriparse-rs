@@ -1,5 +1,5 @@
 [package]
-authors = ["sgodw <sgodwincs@gmail.com>"]
+authors = ["Scott Godwin <sgodwincs@gmail.com>"]
 name = "uri"
 version = "0.1.0"
 
