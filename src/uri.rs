@@ -1,5 +1,5 @@
-use std::borrow::Cow;
 use std::convert::TryFrom;
+use std::error::Error;
 use std::fmt::{self, Display, Formatter, Write};
 
 use authority::{parse_authority, Authority, Host, InvalidAuthority, Password, Username};
@@ -21,7 +21,7 @@ impl From<!> for InvalidURI {
 
 impl<'uri> URI<'uri> {
     pub fn authority(&self) -> Option<&Authority<'uri>> {
-        self.authority.as_ref()
+        self.uri_reference.authority()
     }
 
     pub fn from_parts<
@@ -42,7 +42,7 @@ impl<'uri> URI<'uri> {
         path: PathType,
         query: Option<QueryType>,
         fragment: Option<FragmentType>,
-    ) -> Result<URIReference<'new_uri>, InvalidURI>
+    ) -> Result<URI<'new_uri>, InvalidURI>
     where
         Scheme<'new_uri>: TryFrom<SchemeType, Error = SchemeError>,
         Authority<'new_uri>: TryFrom<AuthorityType, Error = AuthorityError>,
@@ -56,12 +56,13 @@ impl<'uri> URI<'uri> {
             + From<FragmentError>,
     {
         let uri_reference =
-            URIReference::from_parts(Some(scheme), authority, path, query, fragment)?;
+            URIReference::from_parts(Some(scheme), authority, path, query, fragment)
+                .map_err(|error| InvalidURI::try_from(error).unwrap())?;
         Ok(URI { uri_reference })
     }
 
     pub fn fragment(&self) -> Option<&Fragment<'uri>> {
-        self.uri_reference.has_fragment()
+        self.uri_reference.fragment()
     }
 
     pub fn has_authority(&self) -> bool {
@@ -160,7 +161,8 @@ impl<'uri> TryFrom<&'uri [u8]> for URI<'uri> {
     type Error = InvalidURI;
 
     fn try_from(value: &'uri [u8]) -> Result<Self, Self::Error> {
-        let uri_reference = URIReference::try_from(value)?;
+        let uri_reference =
+            URIReference::try_from(value).map_err(|error| InvalidURI::try_from(error).unwrap())?;
 
         if uri_reference.is_relative_reference() {
             Err(InvalidURI::CannotBeRelativeReference)
@@ -572,10 +574,10 @@ impl TryFrom<InvalidURIReference> for InvalidURI {
             InvalidURIReference::AbsolutePathCannotStartWithTwoSlashes
             | InvalidURIReference::SchemelessPathCannotStartWithColonSegment => Err(()),
             InvalidURIReference::InvalidAuthority(invalid_authority) => {
-                InvalidAuthority(invalid_authority)
+                Ok(InvalidAuthority(invalid_authority))
             }
             InvalidURIReference::InvalidFragment(invalid_fragment) => {
-                InvalidFragment(invalid_fragment)
+                Ok(InvalidFragment(invalid_fragment))
             }
             InvalidURIReference::InvalidPath(invalid_path) => Ok(InvalidPath(invalid_path)),
             InvalidURIReference::InvalidQuery(invalid_query) => Ok(InvalidQuery(invalid_query)),
