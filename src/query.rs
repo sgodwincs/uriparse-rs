@@ -156,7 +156,7 @@ impl Error for InvalidQuery {
     }
 }
 
-pub fn parse_query<'query>(
+pub(crate) fn parse_query<'query>(
     value: &'query [u8],
 ) -> Result<(Query<'query>, &'query [u8]), InvalidQuery> {
     let mut bytes = value.iter();

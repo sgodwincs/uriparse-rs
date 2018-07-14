@@ -264,7 +264,9 @@ impl Error for InvalidPath {
     }
 }
 
-pub fn parse_path<'path>(value: &'path [u8]) -> Result<(Path<'path>, &'path [u8]), InvalidPath> {
+pub(crate) fn parse_path<'path>(
+    value: &'path [u8],
+) -> Result<(Path<'path>, &'path [u8]), InvalidPath> {
     fn new_segment<'segment>(segment: &'segment [u8]) -> Segment<'segment> {
         Segment(Cow::from(unsafe { str::from_utf8_unchecked(segment) }))
     }

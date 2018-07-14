@@ -181,10 +181,9 @@ impl<'authority> Display for Authority<'authority> {
         if let Some(ref username) = self.username {
             username.fmt(formatter)?;
 
-            if self.password.is_some() {
+            if let Some(ref password) = self.password {
                 formatter.write_char(':')?;
-
-                // Do not display password.
+                password.fmt(formatter)?;
             }
 
             formatter.write_char('@')?;
@@ -356,6 +355,12 @@ impl<'password> Deref for Password<'password> {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl<'password> Display for Password<'password> {
+    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
+        formatter.write_str(&self.0)
     }
 }
 
@@ -818,7 +823,7 @@ fn check_user_info(value: &[u8]) -> Result<Option<usize>, InvalidUserInfo> {
     Ok(first_colon_index)
 }
 
-pub fn parse_authority<'authority>(
+pub(crate) fn parse_authority<'authority>(
     value: &'authority [u8],
 ) -> Result<(Authority<'authority>, &'authority [u8]), InvalidAuthority> {
     let mut at_index = None;
