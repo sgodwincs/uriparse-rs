@@ -2,7 +2,7 @@
 
 #[macro_use]
 extern crate criterion;
-extern crate uri;
+extern crate uriparse;
 
 use criterion::Criterion;
 use std::convert::TryFrom;
