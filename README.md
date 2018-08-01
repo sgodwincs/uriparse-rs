@@ -1,6 +1,12 @@
 # uriparse-rs
 
+[![LICENSE](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Build Status](https://travis-ci.org/sgodwincs/uriparse-rs.svg?branch=master)](https://travis-ci.org/sgodwincs/uriparse-rs)
+[![Crates.io Version](https://img.shields.io/crates/v/uriparse.svg)](https://crates.io/crates/uriparse)
+
 Implementation of [RFC3986](https://tools.ietf.org/html/rfc3986) including URIs and URI references.
+
+[Documentation](https://docs.rs/uriparse/)
 
 # Normalization
 
