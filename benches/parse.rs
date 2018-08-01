@@ -11,7 +11,7 @@ use uri::URIReference;
 fn parse_benchmark(c: &mut Criterion) {
     let uri = "http://user:pass@192.168.1.1:8080/this/is/a/test/path?thisis=aquery#thisisafragment";
 
-    c.bench_function("parse URI", move |b| {
+    c.bench_function("parse URI reference", move |b| {
         b.iter(|| URIReference::try_from(uri).unwrap())
     });
 }
