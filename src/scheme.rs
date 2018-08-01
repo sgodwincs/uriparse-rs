@@ -38,7 +38,7 @@ macro_rules! schemes {
         lazy_static! {
             static ref SCHEME_NAME_MAP: HashMap<&'static [u8], Scheme<'static>> = {
                 let mut map = HashMap::with_capacity(NUMBER_OF_SCHEMES);
-            
+
             $(
                 map.insert($name.as_bytes(), Scheme::$variant);
             )+
@@ -91,7 +91,7 @@ macro_rules! schemes {
             }
         }
 
-        pub fn parse_scheme(value: &[u8]) -> Result<(Scheme, &[u8]), InvalidScheme> {
+        pub(crate) fn parse_scheme(value: &[u8]) -> Result<(Scheme, &[u8]), InvalidScheme> {
             fn unregistered_scheme<'bytes>(value: &'bytes [u8]) -> Scheme<'bytes> {
                 let scheme = unsafe { str::from_utf8_unchecked(value) };
                 Scheme::Unregistered(UnregisteredScheme(Cow::from(scheme)))
@@ -112,19 +112,19 @@ macro_rules! schemes {
                     _ => end_index += 1
                 }
             }
-    
+
             let (value, rest) = value.split_at(end_index);
 
             if end_index > MAX_REGISTERED_SCHEME_LENGTH {
                 return Ok((unregistered_scheme(value), rest));
             }
-            
+
             let mut lowercase_scheme = [0; MAX_REGISTERED_SCHEME_LENGTH];
 
             for (index, byte) in value.iter().enumerate() {
                 lowercase_scheme[index] = byte.to_ascii_lowercase();
             }
-        
+
             let scheme = SCHEME_NAME_MAP
                 .get(&lowercase_scheme[..end_index])
                 .cloned()
@@ -595,6 +595,7 @@ schemes! {
     (Sieve, "sieve", SchemeStatus::Permanent);
     (SIP, "sip", SchemeStatus::Permanent);
     (SIPS, "sips", SchemeStatus::Permanent);
+    (SimpleLedger, "simpleledger", SchemeStatus::Provisional);
     (Skype, "skype", SchemeStatus::Provisional);
     (SMB, "smb", SchemeStatus::Provisional);
     (SMS, "sms", SchemeStatus::Permanent);
