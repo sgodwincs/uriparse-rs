@@ -89,6 +89,12 @@ impl<'uri> URI<'uri> {
         self.uri_reference.host()
     }
 
+    pub fn into_owned(self) -> URI<'static> {
+        URI {
+            uri_reference: self.uri_reference.into_owned(),
+        }
+    }
+
     pub fn into_parts(
         self,
     ) -> (
@@ -318,6 +324,22 @@ impl<'uri> URIReference<'uri> {
             Some(authority.host())
         } else {
             None
+        }
+    }
+
+    pub fn into_owned(self) -> URIReference<'static> {
+        let scheme = self.scheme.map(|scheme| scheme.into_owned());
+        let authority = self.authority.map(|authority| authority.into_owned());
+        let path = self.path.into_owned();
+        let query = self.query.map(|query| query.into_owned());
+        let fragment = self.fragment.map(|fragment| fragment.into_owned());
+
+        URIReference {
+            authority,
+            fragment,
+            path,
+            query,
+            scheme,
         }
     }
 
