@@ -72,15 +72,54 @@ const USER_INFO_CHAR_MAP: [u8; 256] = [
     0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0, // F
 ];
 
+/// The authority component as defined in
+/// [[RFC3986, Section 3.2](https://tools.ietf.org/html/rfc3986#section-3.2)].
+///
+/// Note that any conversions to a string will **not** hide the password component of the authority.
+/// Be careful if you decide to perform logging.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Authority<'authority> {
+    /// The host component of the authority as defined in
+    /// [[RFC3986, Section 3.2.2](https://tools.ietf.org/html/rfc3986#section-3.2.1)].
     host: Host<'authority>,
+
+    /// The password component of the authority as defined in
+    /// [[RFC3986, Section 3.2.1](https://tools.ietf.org/html/rfc3986#section-3.2.1)].
     password: Option<Password<'authority>>,
+
+    /// The port component of the authority as defined in
+    /// [[RFC3986, Section 3.2.3](https://tools.ietf.org/html/rfc3986#section-3.2.1)].
     port: Option<u16>,
+
+    /// The username component of the authority as defined in
+    /// [[RFC3986, Section 3.2.1](https://tools.ietf.org/html/rfc3986#section-3.2.1)].
     username: Option<Username<'authority>>,
 }
 
 impl<'authority> Authority<'authority> {
+    /// Constructs a new [`Authority`] from the individual parts: username, password, host, and
+    /// port.
+    ///
+    /// Note that the lifetime used by the resulting value will be the lifetime of the parts that
+    /// is most restricted in scope.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Authority;
+    ///
+    /// let authority = Authority::from_parts(
+    ///     Some("username"),
+    ///     Some("password"),
+    ///     "example.com",
+    ///     Some(80)
+    /// ).unwrap();
+    /// assert_eq!(authority.to_string(), "username:password@example.com:80");
+    /// ```
     pub fn from_parts<
         'new_authority,
         UsernameType,
@@ -121,18 +160,80 @@ impl<'authority> Authority<'authority> {
         })
     }
 
+    /// Returns whether or not there is a password in the authority as defined in
+    /// [[RFC3986, Section 3.2.1](https://tools.ietf.org/html/rfc3986#section-3.2.1)].
+    ///
+    /// Note that there will only be a password if the URI has a user information component *and*
+    /// the component contains the `':'` delimiter.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Authority;
+    ///
+    /// let authority = Authority::try_from("username:password@example.com").unwrap();
+    /// assert_eq!(authority.has_password(), true);
+    /// ```
     pub fn has_password(&self) -> bool {
         self.password.is_some()
     }
 
+    /// Returns whether or not there is a username in the authority as defined in
+    /// [[RFC3986, Section 3.2.1](https://tools.ietf.org/html/rfc3986#section-3.2.1)].
+    ///
+    /// Note that there will *always* be a username as long as there is a `'@'` delimiter present
+    /// in the URI.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Authority;
+    ///
+    /// let authority = Authority::try_from("username@example.com").unwrap();
+    /// assert_eq!(authority.has_username(), true);
+    /// ```
     pub fn has_username(&self) -> bool {
         self.username.is_some()
     }
 
+    /// The host component of the authority as defined in
+    /// [[RFC3986, Section 3.2.2](https://tools.ietf.org/html/rfc3986#section-3.2.2)].
+    ///
+    /// An authority component always has a host, though it may be an empty registered name.
+    ///
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Authority;
+    ///
+    /// let authority = Authority::try_from("username:password@example.com").unwrap();
+    /// assert_eq!(authority.host().to_string().as_str(), "example.com");
+    /// ```
     pub fn host(&self) -> &Host<'authority> {
         &self.host
     }
 
+    /// Converts the [`Authority`] into an owned copy.
+    ///
+    /// If you construct the authority from a source with a non-static lifetime, you may run into
+    /// lifetime problems due to the way the struct is designed. Calling this function will ensure
+    /// that the returned value has a static lifetime.
+    ///
+    /// Note that this is different from just cloning. Cloning the authority will just copy the
+    /// references, and thus the lifetime will remain the same.
     pub fn into_owned(self) -> Authority<'static> {
         let password = self.password.map(|password| password.into_owned());
         let username = self.username.map(|username| username.into_owned());
@@ -150,6 +251,25 @@ impl<'authority> Authority<'authority> {
         }
     }
 
+    /// Consumes the [`Authority`] and returns its parts: username, password, host, and port.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Authority;
+    ///
+    /// let authority = Authority::try_from("username:password@example.com:80").unwrap();
+    /// let (username, password, host, port) = authority.into_parts();
+    ///
+    /// assert_eq!(username.unwrap(), "username");
+    /// assert_eq!(password.unwrap(), "password");
+    /// assert_eq!(host.to_string(), "example.com");
+    /// assert_eq!(port.unwrap(), 80);
+    /// ```
     pub fn into_parts(
         self,
     ) -> (
@@ -161,14 +281,69 @@ impl<'authority> Authority<'authority> {
         (self.username, self.password, self.host, self.port)
     }
 
+    /// The password component of the authority as defined in
+    /// [[RFC3986, Section 3.2.1](https://tools.ietf.org/html/rfc3986#section-3.2.1)].
+    ///
+    /// The password will be `None` if the user information component of the authority did not
+    /// contain a `':'`. Otherwise, it will be whatever is after the `':'` until the `'@'`
+    /// character. It may be empty as well.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Authority;
+    ///
+    /// let authority = Authority::try_from("username:password@example.com").unwrap();
+    /// assert_eq!(authority.password().unwrap(), "password");
+    /// ```
     pub fn password(&self) -> Option<&Password<'authority>> {
         self.password.as_ref()
     }
 
+    /// The port component of the authority as defined in
+    /// [[RFC3986, Section 3.2.3]](https://tools.ietf.org/html/rfc3986#section-3.2.3).
+    ///
+    /// The port will be `None` if a port was not specified.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Authority;
+    ///
+    /// let authority = Authority::try_from("example.com:80").unwrap();
+    /// assert_eq!(authority.port().unwrap(), 80);
+    /// ```
     pub fn port(&self) -> Option<u16> {
         self.port
     }
 
+    /// The username component of the authority as defined in
+    /// [[RFC3986, Section 3.2.1](https://tools.ietf.org/html/rfc3986#section-3.2.1)].
+    ///
+    /// The username will be `None` if the user information component of the authority did not
+    /// contain a `':'`. Otherwise, it will be whatever is after the `':'` until the `'@'`
+    /// character. It may be empty as well.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Authority;
+    ///
+    /// let authority = Authority::try_from("username:password@example.com").unwrap();
+    /// assert_eq!(authority.password().unwrap(), "password");
+    /// ```
     pub fn username(&self) -> Option<&Username<'authority>> {
         self.username.as_ref()
     }
@@ -206,7 +381,7 @@ impl<'authority> Display for Authority<'authority> {
 
 impl<'authority> From<Authority<'authority>> for String {
     fn from(value: Authority<'authority>) -> String {
-        format!("{}", value)
+        value.to_string()
     }
 }
 
@@ -219,7 +394,7 @@ impl<'authority> TryFrom<&'authority [u8]> for Authority<'authority> {
         if rest.is_empty() {
             Ok(authority)
         } else {
-            Err(InvalidAuthority::FoundPath)
+            Err(InvalidAuthority::ExpectedEOF)
         }
     }
 }
@@ -232,11 +407,101 @@ impl<'authority> TryFrom<&'authority str> for Authority<'authority> {
     }
 }
 
+/// The host component of the authority as defined in
+/// [[RFC3986, Section 3.2.2](https://tools.ietf.org/html/rfc3986#section-3.2.1)].
+///
+/// Note that the RFC mentions support for future IP address literals. Of course, as of this moment
+/// there exist none, so hosts of the form `"[v*...]"` where `'*'` is a hexadecimal digit and
+/// `'...'` is the actual IP literal are not considered valid.
+///
+/// Also, the host is case-insensitive meaning that `"example.com"` and `"ExAmPlE.CoM"` refer to the
+/// same host. Furthermore, percent-encoding plays no role in equality checking meaning that
+/// `"example.com"` and `"exampl%65.com"` also refer to the same host. Both of these attributes are
+/// reflected in the equality and hash functions.
+///
+/// However, be aware that just because percent-encoding plays no role in equality checking does not
+/// mean that the host is normalized. The original host string (in the case of a registered name)
+/// will always be preserved as is with no normalization performed.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Host<'host> {
+    /// An IPv4 address.
     IPv4Address(Ipv4Addr),
+
+    /// An IPv6 address. Note that this will always be encased in brackets (`'['` and `']'`).
     IPv6Address(Ipv6Addr),
+
+    /// Any other host that does not follow the syntax of an IP address. Note that this includes
+    /// even hosts of the form `"999.999.999.999"`. One might expect this to produce an invalid
+    /// IPv4 error, but the RFC states that it is a "first-match-wins" algorithm, and that host does
+    /// not match the IPv4 literal syntax.
+    ///
+    /// This may be changed in the future, since arguments can be made from either side.
     RegisteredName(RegisteredName<'host>),
+}
+
+impl<'host> Host<'host> {
+    /// Returns whether or not the host is an IPv4 address.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Host;
+    ///
+    /// let host = Host::try_from("192.168.1.1").unwrap();
+    /// assert!(host.is_ipv4_address());
+    /// ```
+    pub fn is_ipv4_address(&self) -> bool {
+        match self {
+            Host::IPv4Address(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Returns whether or not the host is an IPv6 address.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Host;
+    ///
+    /// let host = Host::try_from("[::1]").unwrap();
+    /// assert!(host.is_ipv6_address());
+    /// ```
+    pub fn is_ipv6_address(&self) -> bool {
+        match self {
+            Host::IPv6Address(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Returns whether or not the host is a registered name.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Host;
+    ///
+    /// let host = Host::try_from("example.com").unwrap();
+    /// assert!(host.is_registered_name());
+    /// ```
+    pub fn is_registered_name(&self) -> bool {
+        match self {
+            Host::RegisteredName(_) => true,
+            _ => false,
+        }
+    }
 }
 
 impl<'host> Display for Host<'host> {
@@ -244,10 +509,16 @@ impl<'host> Display for Host<'host> {
         use self::Host::*;
 
         match self {
-            IPv4Address(address) => write!(formatter, "{}", address),
-            IPv6Address(address) => write!(formatter, "{}", address),
+            IPv4Address(address) => address.fmt(formatter),
+            IPv6Address(address) => address.fmt(formatter),
             RegisteredName(name) => formatter.write_str(name.as_str()),
         }
+    }
+}
+
+impl<'host> From<Host<'host>> for String {
+    fn from(value: Host<'host>) -> String {
+        value.to_string()
     }
 }
 
@@ -279,7 +550,7 @@ impl<'host> TryFrom<&'host [u8]> for Host<'host> {
                         let ipvfuture = &value[3..value.len() - 1];
 
                         if check_ipvfuture(ipvfuture) {
-                            return Err(InvalidHost::AddressMechanismNotSupport);
+                            return Err(InvalidHost::AddressMechanismNotSupported);
                         } else {
                             return Err(InvalidHost::InvalidIPvFutureCharacter);
                         }
@@ -295,9 +566,12 @@ impl<'host> TryFrom<&'host [u8]> for Host<'host> {
                     return Err(InvalidHost::InvalidIPv6Character);
                 }
 
+                // Unsafe: The function above [`check_ipv6`] ensures this is valid ASCII implying
+                // valid UTF-8.
+
                 let ipv6: Ipv6Addr = unsafe { str::from_utf8_unchecked(ipv6) }
                     .parse()
-                    .map_err(|_| InvalidHost::InvalidIPv6)?;
+                    .map_err(|_| InvalidHost::InvalidIPv6Format)?;
                 Ok(Host::IPv6Address(ipv6))
             }
             _ => {
@@ -305,6 +579,9 @@ impl<'host> TryFrom<&'host [u8]> for Host<'host> {
                     match unsafe { str::from_utf8_unchecked(value) }.parse() {
                         Ok(ipv4) => Ok(Host::IPv4Address(ipv4)),
                         Err(_) => {
+                            // Unsafe: The function above [`check_ipv4_or_registered_name`] ensures
+                            // this is valid ASCII implying valid UTF-8.
+
                             let name = unsafe { str::from_utf8_unchecked(value) };
                             Ok(Host::RegisteredName(RegisteredName(Cow::from(name))))
                         }
@@ -325,14 +602,50 @@ impl<'host> TryFrom<&'host str> for Host<'host> {
     }
 }
 
+/// The password component of the authority as defined in
+/// [[RFC3986, Section 3.2.1](https://tools.ietf.org/html/rfc3986#section-3.2.1)].
+///
+/// Even though this library supports parsing the password from the user information, it should be
+/// noted that the format "username:password" is deprecated. Also, be careful logging this!
+///
+/// Note that the password is case-sensitive. However, percent-encoding plays no role in equality
+/// checking meaning that `"password"` and `"p%61ssword"` refer to the same password. Both of these
+/// attributes are reflected in the equality and hash functions.
+///
+/// Be aware that just because percent-encoding plays no role in equality checking does not
+/// mean that the password is normalized. The original password string will always be preserved as
+/// is with no normalization performed. You should perform percent-encoding normalization if you
+/// want to use the password for any sort of authentication (not recommended).
 #[derive(Clone, Debug)]
 pub struct Password<'password>(Cow<'password, str>);
 
 impl<'password> Password<'password> {
+    /// Returns a `str` representation of the password.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Password;
+    ///
+    /// let password = Password::try_from("password").unwrap();
+    /// assert_eq!(password, "password");
+    /// ```
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
+    /// Converts the [`Password`] into an owned copy.
+    ///
+    /// If you construct the authority from a source with a non-static lifetime, you may run into
+    /// lifetime problems due to the way the struct is designed. Calling this function will ensure
+    /// that the returned value has a static lifetime.
+    ///
+    /// Note that this is different from just cloning. Cloning the password will just copy the
+    /// references, and thus the lifetime will remain the same.
     pub fn into_owned(self) -> Password<'static> {
         Password(Cow::from(self.0.into_owned()))
     }
@@ -365,6 +678,12 @@ impl<'password> Display for Password<'password> {
 }
 
 impl<'password> Eq for Password<'password> {}
+
+impl<'password> From<Password<'password>> for String {
+    fn from(value: Password<'password>) -> String {
+        value.to_string()
+    }
+}
 
 impl<'password> Hash for Password<'password> {
     fn hash<H>(&self, state: &mut H)
@@ -423,6 +742,16 @@ impl<'password> TryFrom<&'password str> for Password<'password> {
     }
 }
 
+/// A host that is a registered name (i.e. not an IP literal).
+///
+/// Note that the host is case-insensitive meaning that `"example.com"` and `"ExAmPlE.CoM"` refer to
+/// the same host. Furthermore, percent-encoding plays no role in equality checking meaning that
+/// `"example.com"` and `"exampl%65.com"` also refer to the same host. Both of these attributes are
+/// reflected in the equality and hash functions.
+///
+/// However, be aware that just because percent-encoding plays no role in equality checking does not
+/// mean that the host is normalized. The original host string will always be preserved as is with
+/// no normalization performed.
 #[derive(Clone, Debug)]
 pub struct RegisteredName<'name>(Cow<'name, str>);
 
@@ -455,6 +784,12 @@ impl<'name> Display for RegisteredName<'name> {
 }
 
 impl<'name> Eq for RegisteredName<'name> {}
+
+impl<'name> From<RegisteredName<'name>> for String {
+    fn from(value: RegisteredName<'name>) -> String {
+        value.to_string()
+    }
+}
 
 impl<'name> Hash for RegisteredName<'name> {
     fn hash<H>(&self, state: &mut H)
@@ -514,6 +849,16 @@ impl<'name> TryFrom<&'name str> for RegisteredName<'name> {
     }
 }
 
+/// The username component of the authority as defined in
+/// [[RFC3986, Section 3.2.1](https://tools.ietf.org/html/rfc3986#section-3.2.1)].
+///
+/// Note that the username is case-sensitive. However, percent-encoding plays no role in equality
+/// checking meaning that `"username"` and `"usern%61me"` refer to the same username. Both of these
+/// attributes are reflected in the equality and hash functions.
+///
+/// Be aware that just because percent-encoding plays no role in equality checking does not
+/// mean that the username is normalized. The original username string will always be preserved as
+/// is with no normalization performed.
 #[derive(Clone, Debug)]
 pub struct Username<'username>(Cow<'username, str>);
 
@@ -554,6 +899,12 @@ impl<'username> Display for Username<'username> {
 }
 
 impl<'username> Eq for Username<'username> {}
+
+impl<'username> From<Username<'username>> for String {
+    fn from(value: Username<'username>) -> String {
+        value.to_string()
+    }
+}
 
 impl<'username> Hash for Username<'username> {
     fn hash<H>(&self, state: &mut H)
@@ -615,11 +966,23 @@ impl<'username> TryFrom<&'username str> for Username<'username> {
     }
 }
 
+/// An error representing an invalid authority.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum InvalidAuthority {
-    FoundPath,
+    /// This error occurs when the string from which the authority is parsed is not entirely
+    /// consumed during the parsing. For example, parsing the string `"example.com/"` would generate
+    /// this error since `"/"` would still be left over.
+    ///
+    /// Note that this only applies to the [`Authority::try_from`] functions.
+    ExpectedEOF,
+
+    /// The host component of the authority was invalid.
     InvalidHost(InvalidHost),
+
+    /// The port component of the authority was invalid.
     InvalidPort(InvalidPort),
+
+    /// The user information component of the authority was invalid.
     InvalidUserInfo(InvalidUserInfo),
 }
 
@@ -634,7 +997,7 @@ impl Error for InvalidAuthority {
         use self::InvalidAuthority::*;
 
         match self {
-            FoundPath => "path not allowed in authority",
+            ExpectedEOF => "expected end of file",
             InvalidHost(invalid_host) => invalid_host.description(),
             InvalidPort(invalid_port) => invalid_port.description(),
             InvalidUserInfo(invalid_user_info) => invalid_user_info.description(),
@@ -666,12 +1029,27 @@ impl From<InvalidUserInfo> for InvalidAuthority {
     }
 }
 
+/// An error representing an invalid host.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum InvalidHost {
-    AddressMechanismNotSupport,
+    /// The syntax for a future IP literal was used and is not currently supported.
+    AddressMechanismNotSupported,
+
+    /// An invalid character for an IPv4 address or registered name was used. Due to the ambiguity
+    /// of the grammar, it is not possible to say which. It is also possible that all the characters
+    /// were valid, but there was an invalid percent encoding (e.g. `"%zz"`).
     InvalidIPv4OrRegisteredNameCharacter,
-    InvalidIPv6,
+
+    /// The syntax for an IPv6 literal was used (i.e. `"[...]"`) and all of the characters were
+    /// valid IPv6 characters. However, the format of the literal was invalid.
+    InvalidIPv6Format,
+
+    /// The syntax for an IPv6 literal was used (i.e. `"[...]"`), but it contained an invalid IPv6
+    /// character.
     InvalidIPv6Character,
+
+    /// The syntax for a future IP literal was used (i.e. `"[v*...]"` where `"*"` is a hexadecimal
+    /// digit), but it contained an invalid character.
     InvalidIPvFutureCharacter,
 }
 
@@ -686,18 +1064,22 @@ impl Error for InvalidHost {
         use self::InvalidHost::*;
 
         match self {
-            AddressMechanismNotSupport => "address mechanism not supported",
+            AddressMechanismNotSupported => "address mechanism not supported",
             InvalidIPv4OrRegisteredNameCharacter => "invalid IPv4 or registered name character",
-            InvalidIPv6 => "invalid IPv6",
+            InvalidIPv6Format => "invalid IPv6 format",
             InvalidIPv6Character => "invalid IPv6 character",
             InvalidIPvFutureCharacter => "invalid IPvFuture character",
         }
     }
 }
 
+/// An error representing an invalid port.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum InvalidPort {
+    /// An invalid character was used in the port. Only decimal digits are allowed.
     InvalidCharacter,
+
+    /// The port was a valid number, but it was too large to fit in a `u16`.
     Overflow,
 }
 
@@ -718,6 +1100,11 @@ impl Error for InvalidPort {
     }
 }
 
+/// An error representing an invalid registered name.
+///
+/// This implies that the registered name contained an invalid host character or had an invalid
+/// percent encoding. Note that this error is not possible from parsing an authority. It can only be
+/// returned from directly parsing a registered name.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct InvalidRegisteredName;
 
@@ -733,9 +1120,13 @@ impl Error for InvalidRegisteredName {
     }
 }
 
+/// An error representing an invalid user information component.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum InvalidUserInfo {
+    /// The user information contained an invalid character.
     InvalidCharacter,
+
+    /// The user information contained an invalid percent encoding (e.g. `"%zz"`).
     InvalidPercentEncoding,
 }
 
@@ -834,6 +1225,7 @@ pub(crate) fn parse_authority<'authority>(
         match byte {
             b'@' => if at_index.is_none() {
                 at_index = Some(index);
+                last_colon_index = None;
             },
             b':' => last_colon_index = Some(index),
             b']' => last_colon_index = None,
