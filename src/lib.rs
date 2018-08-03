@@ -21,5 +21,5 @@ pub use authority::{
 pub use fragment::{Fragment, InvalidFragment};
 pub use path::{InvalidPath, Path, Segment};
 pub use query::{InvalidQuery, Query};
-pub use scheme::{InvalidScheme, Scheme, SchemeStatus};
+pub use scheme::{InvalidScheme, Scheme, SchemeStatus, UnregisteredScheme};
 pub use uri::{InvalidURI, InvalidURIReference, URIReference, URI};

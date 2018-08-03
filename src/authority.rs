@@ -1,3 +1,7 @@
+//! Authority Component
+//!
+//! See [[RFC3986, Section 3.2](https://tools.ietf.org/html/rfc3986#section-3.2)].
+
 use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::error::Error;

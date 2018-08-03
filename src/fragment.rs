@@ -1,3 +1,7 @@
+//! Fragment Component
+//!
+//! See [[RFC3986, Section 3.5](https://tools.ietf.org/html/rfc3986#section-3.2)].
+
 use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::error::Error;
@@ -8,6 +12,7 @@ use std::str;
 
 use utility::{percent_encoded_hash, percent_encoded_string_equality};
 
+/// A map of byte characters that determines if a character is a valid fragment character.
 #[cfg_attr(rustfmt, rustfmt_skip)]
 const FRAGMENT_CHAR_MAP: [u8; 256] = [
  // 0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F
@@ -29,14 +34,46 @@ const FRAGMENT_CHAR_MAP: [u8; 256] = [
     0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0, // F
 ];
 
+/// The fragment component as defined in
+/// [[RFC3986, Section 3.5](https://tools.ietf.org/html/rfc3986#section-3.2)].
+///
+/// The fragment is case-sensitive. Furthermore, percent-encoding plays no role in equality checking
+/// meaning that `"fragment"` and `"fr%61gment"` are the same fragment. Both of these attributes are
+/// reflected in the equality and hash functions.
+///
+/// However, be aware that just because percent-encoding plays no role in equality checking does not
+/// mean that the fragment is normalized. The original fragment string will always be preserved as
+/// is with no normalization performed.
 #[derive(Clone, Debug)]
 pub struct Fragment<'fragment>(Cow<'fragment, str>);
 
 impl<'fragment> Fragment<'fragment> {
+    /// Returns a `str` representation of the fragment.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Fragment;
+    ///
+    /// let fragment = Fragment::try_from("fragment").unwrap();
+    /// assert_eq!(fragment, "fragment");
+    /// ```
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
+    /// Converts the [`Fragment`] into an owned copy.
+    ///
+    /// If you construct the fragment from a source with a non-static lifetime, you may run into
+    /// lifetime problems due to the way the struct is designed. Calling this function will ensure
+    /// that the returned value has a static lifetime.
+    ///
+    /// Note that this is different from just cloning. Cloning the fragment will just copy the
+    /// references, and thus the lifetime will remain the same.
     pub fn into_owned(self) -> Fragment<'static> {
         Fragment(Cow::from(self.0.into_owned()))
     }
@@ -69,6 +106,12 @@ impl<'fragment> Display for Fragment<'fragment> {
 }
 
 impl<'fragment> Eq for Fragment<'fragment> {}
+
+impl<'fragment> From<Fragment<'fragment>> for String {
+    fn from(value: Fragment<'fragment>) -> String {
+        value.to_string()
+    }
+}
 
 impl<'fragment> Hash for Fragment<'fragment> {
     fn hash<H>(&self, state: &mut H)
@@ -143,9 +186,13 @@ impl<'fragment> TryFrom<&'fragment str> for Fragment<'fragment> {
     }
 }
 
+/// An error representing an invalid fragment.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum InvalidFragment {
+    /// The fragment contained an invalid character.
     InvalidCharacter,
+
+    /// The fragment contained an invalid percent encoding (e.g. `"%zz"`).
     InvalidPercentEncoding,
 }
 

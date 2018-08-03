@@ -1,3 +1,9 @@
+//! Scheme Component
+//!
+//! See [[RFC3986, Section 3.5](https://tools.ietf.org/html/rfc3986#section-3.1)]. For a list of
+//! the listed schemes, see
+//! [iana.org](https://www.iana.org/assignments/uri-schemes/uri-schemes.xhtml).
+
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -6,8 +12,14 @@ use std::fmt::{self, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::str;
 
+/// The length of the longest currently registered scheme. This is used internally for parsing. Make
+/// sure to check this whenever adding a new scheme.
 const MAX_REGISTERED_SCHEME_LENGTH: usize = 36;
-const NUMBER_OF_SCHEMES: usize = 283;
+
+/// The number of registered schemes. Make sure to update this whenever adding a new scheme.
+const NUMBER_OF_SCHEMES: usize = 284;
+
+/// A map of byte characters that determines if a character is a valid scheme character.
 #[cfg_attr(rustfmt, rustfmt_skip)]
 const SCHEME_CHAR_MAP: [u8; 256] = [
  // 0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F
@@ -36,6 +48,8 @@ macro_rules! schemes {
         )+
     ) => {
         lazy_static! {
+            /// An immutable hashmap mapping scheme names to their corresponding [`Scheme`]
+            /// variants.
             static ref SCHEME_NAME_MAP: HashMap<&'static [u8], Scheme<'static>> = {
                 let mut map = HashMap::with_capacity(NUMBER_OF_SCHEMES);
 
@@ -47,6 +61,15 @@ macro_rules! schemes {
             };
         }
 
+        /// The scheme component as defined in
+        /// [[RFC3986, Section 3.5](https://tools.ietf.org/html/rfc3986#section-3.2)]. The schemes
+        /// listed here come from
+        /// [iana.org](https://www.iana.org/assignments/uri-schemes/uri-schemes.xhtml). Any scheme
+        /// not listed there is considered unregistered and will be contained in
+        /// [`Scheme::UnregisteredScheme`].
+        ///
+        /// An unregistered scheme is case-insensitive. Furthermore, percent-encoding is not allowed
+        /// in schemes.
         #[derive(Clone, Debug, Eq, Hash, PartialEq)]
         #[non_exhaustive]
         pub enum Scheme<'scheme> {
@@ -57,6 +80,26 @@ macro_rules! schemes {
         }
 
         impl<'scheme> Scheme<'scheme> {
+            /// Returns a `str` representation of the scheme.
+            ///
+            /// Note that the case of the scheme will be lowercase if it was a registered scheme.
+            /// Otherwise, the string representation will be exactly that of the original string
+            /// including case-sensitivity.
+            ///
+            /// # Examples
+            ///
+            /// ```
+            /// # #![feature(try_from)]
+            /// #
+            /// use std::convert::TryFrom;
+            ///
+            /// use uriparse::Scheme;
+            ///
+            /// assert_eq!(Scheme::HTTP.as_str(), "http");
+            ///
+            /// let scheme = Scheme::try_from("TEST-scheme").unwrap();
+            /// assert_eq!(scheme.as_str(), "TEST-scheme");
+            /// ```
             pub fn as_str(&self) -> &str {
                 use self::Scheme::*;
 
@@ -68,6 +111,15 @@ macro_rules! schemes {
                 }
             }
 
+            /// Converts the [`Scheme`] into an owned copy.
+            ///
+            /// If you construct the scheme from a source with a non-static lifetime, you may run
+            /// into lifetime problems due to the way it is designed. Calling this function will
+            /// ensure that the returned value has a static lifetime.
+            ///
+            /// Note that this is different from just cloning. Cloning the scheme will just copy the
+            /// references (in the case of an unregistered scheme), and thus the lifetime will
+            /// remain the same.
             pub fn into_owned(self) -> Scheme<'static> {
                 use self::Scheme::*;
 
@@ -79,6 +131,15 @@ macro_rules! schemes {
                 }
             }
 
+            /// Returns the registration status of the scheme.
+            ///
+            /// # Examples
+            ///
+            /// ```
+            /// use uriparse::{Scheme, SchemeStatus};
+            ///
+            /// assert_eq!(Scheme::HTTP.status(), SchemeStatus::Permanent);
+            /// ```
             pub fn status(&self) -> SchemeStatus {
                 use self::Scheme::*;
 
@@ -91,6 +152,7 @@ macro_rules! schemes {
             }
         }
 
+        /// Parses the scheme from the given byte string.
         pub(crate) fn parse_scheme(value: &[u8]) -> Result<(Scheme, &[u8]), InvalidScheme> {
             fn unregistered_scheme<'bytes>(value: &'bytes [u8]) -> Scheme<'bytes> {
                 let scheme = unsafe { str::from_utf8_unchecked(value) };
@@ -114,6 +176,9 @@ macro_rules! schemes {
             }
 
             let (value, rest) = value.split_at(end_index);
+
+            // It is important to make sure that [`MAX_REGISTERED_SCHEME_LENGTH`] is correctly
+            // maintained, or registered schemes may be set as unregistered.
 
             if end_index > MAX_REGISTERED_SCHEME_LENGTH {
                 return Ok((unregistered_scheme(value), rest));
@@ -150,6 +215,12 @@ impl<'scheme> AsRef<str> for Scheme<'scheme> {
 impl<'scheme> Display for Scheme<'scheme> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         formatter.write_str(self.as_str())
+    }
+}
+
+impl<'scheme> From<Scheme<'scheme>> for String {
+    fn from(value: Scheme<'scheme>) -> String {
+        value.to_string()
     }
 }
 
@@ -199,14 +270,42 @@ impl<'scheme> TryFrom<&'scheme str> for Scheme<'scheme> {
     }
 }
 
+/// A scheme that is not in the
+/// [registered schemes](https://www.iana.org/assignments/uri-schemes/uri-schemes.xhtml).
+///
+/// Note that this is case-insensitive, and this is reflected in the equality and hash functions.
 #[derive(Clone, Debug)]
 pub struct UnregisteredScheme<'scheme>(Cow<'scheme, str>);
 
 impl<'scheme> UnregisteredScheme<'scheme> {
+    /// Returns a `str` representation of the scheme.
+    ///
+    /// Note that the case-sensitivity of the original string is preserved.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::UnregisteredScheme;
+    ///
+    /// let scheme = UnregisteredScheme::try_from("TEST-scheme").unwrap();
+    /// assert_eq!(scheme.as_str(), "TEST-scheme");
+    /// ```
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
+    /// Converts the [`UnregisteredScheme`] into an owned copy.
+    ///
+    /// If you construct the scheme from a source with a non-static lifetime, you may run into
+    /// lifetime problems due to the way the struct is designed. Calling this function will ensure
+    /// that the returned value has a static lifetime.
+    ///
+    /// Note that this is different from just cloning. Cloning the scheme will just copy the
+    /// references, and thus the lifetime will remain the same.
     pub fn into_owned(self) -> UnregisteredScheme<'static> {
         UnregisteredScheme(Cow::from(self.0.into_owned()))
     }
@@ -231,6 +330,12 @@ impl<'scheme> Display for UnregisteredScheme<'scheme> {
 }
 
 impl<'scheme> Eq for UnregisteredScheme<'scheme> {}
+
+impl<'scheme> From<UnregisteredScheme<'scheme>> for String {
+    fn from(value: UnregisteredScheme<'scheme>) -> String {
+        value.to_string()
+    }
+}
 
 impl<'scheme> Hash for UnregisteredScheme<'scheme> {
     fn hash<H>(&self, state: &mut H)
@@ -290,11 +395,23 @@ impl<'scheme> TryFrom<&'scheme str> for UnregisteredScheme<'scheme> {
     }
 }
 
+/// An error representing an invalid scheme.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum InvalidScheme {
+    /// The scheme component was empty.
     CannotBeEmpty,
+
+    /// This error occurs when the string from which the scheme is parsed is not entirely consumed
+    /// during the parsing. For example, parsing the string `"http:"` would generate
+    /// this error since `":"` would still be left over.
+    ///
+    /// Note that this only applies to the [`Scheme::try_from`] functions.
     ExpectedEOF,
+
+    /// The scheme contained an invalid scheme character.
     InvalidCharacter,
+
+    /// The scheme did not start with an alphabetic character.
     MustStartWithAlphabetic,
 }
 
@@ -317,6 +434,8 @@ impl Error for InvalidScheme {
     }
 }
 
+/// An error representing that the unregistered scheme was an invalid scheme, or it was actually
+/// a registered scheme.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct InvalidUnregisteredScheme;
 
@@ -332,15 +451,36 @@ impl Error for InvalidUnregisteredScheme {
     }
 }
 
+/// The registration status of a scheme. See [RFC 7595](https://tools.ietf.org/html/rfc7595) for
+/// more information.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum SchemeStatus {
+    /// A scheme registered due to historical use. Generally, it is no longer in common use or is
+    /// not recommended.
     Historical,
+
+    /// A scheme that has been expertly reviewed.
     Permanent,
+
+    /// A scheme that was registered on a first come first served basis.
     Provisional,
+
+    /// A scheme that is not currently registerd under
+    /// [iana.org](https://www.iana.org/assignments/uri-schemes/uri-schemes.xhtml).
     Unregistered,
 }
 
 impl SchemeStatus {
+    /// Returns whether or not the scheme status is historical.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use uriparse::Scheme;
+    ///
+    /// assert_eq!(Scheme::Fax.status().is_historical(), true);
+    /// assert_eq!(Scheme::HTTP.status().is_historical(), false);
+    /// ```
     pub fn is_historical(&self) -> bool {
         match self {
             SchemeStatus::Historical => true,
@@ -348,6 +488,16 @@ impl SchemeStatus {
         }
     }
 
+    /// Returns whether or not the scheme status is historical.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use uriparse::Scheme;
+    ///
+    /// assert_eq!(Scheme::HTTP.status().is_permanent(), true);
+    /// assert_eq!(Scheme::IRC.status().is_permanent(), false);
+    /// ```
     pub fn is_permanent(&self) -> bool {
         match self {
             SchemeStatus::Permanent => true,
@@ -355,6 +505,16 @@ impl SchemeStatus {
         }
     }
 
+    /// Returns whether or not the scheme status is historical.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use uriparse::Scheme;
+    ///
+    /// assert_eq!(Scheme::Git.status().is_provisional(), true);
+    /// assert_eq!(Scheme::RTSP.status().is_provisional(), false);
+    /// ```
     pub fn is_provisional(&self) -> bool {
         match self {
             SchemeStatus::Provisional => true,
@@ -362,6 +522,21 @@ impl SchemeStatus {
         }
     }
 
+    /// Returns whether or not the scheme status is historical.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Scheme;
+    ///
+    /// let scheme = Scheme::try_from("test-scheme").unwrap();
+    /// assert_eq!(scheme.status().is_unregistered(), true);
+    /// assert_eq!(Scheme::HTTPS.status().is_unregistered(), false);
+    /// ```
     pub fn is_unregistered(&self) -> bool {
         match self {
             SchemeStatus::Unregistered => true,
