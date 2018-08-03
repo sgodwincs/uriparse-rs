@@ -9,6 +9,8 @@ use std::str;
 
 use utility::{percent_encoded_hash, percent_encoded_string_equality};
 
+/// A map of byte characters that determines if a character is a valid IPv4 or registered name
+/// character.
 #[cfg_attr(rustfmt, rustfmt_skip)]
 const IPV4_AND_REGISTERED_NAME_CHAR_MAP: [u8; 256] = [
  // 0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F
@@ -30,6 +32,7 @@ const IPV4_AND_REGISTERED_NAME_CHAR_MAP: [u8; 256] = [
     0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0, // F
 ];
 
+/// A map of byte characters that determines if a character is a valid future IP literal character.
 #[cfg_attr(rustfmt, rustfmt_skip)]
 const IPV_FUTURE_CHAR_MAP: [u8; 256] = [
  // 0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F
@@ -51,6 +54,7 @@ const IPV_FUTURE_CHAR_MAP: [u8; 256] = [
     0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0, // F
 ];
 
+/// A map of byte characters that determines if a character is a valid user information character.
 #[cfg_attr(rustfmt, rustfmt_skip)]
 const USER_INFO_CHAR_MAP: [u8; 256] = [
  // 0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F
@@ -1147,6 +1151,8 @@ impl Error for InvalidUserInfo {
     }
 }
 
+/// Returns true if the byte string contains only valid IPv4 or registered name characters. This
+/// also ensures that percent encodings are valid.
 fn check_ipv4_or_registered_name(value: &[u8]) -> bool {
     let mut bytes = value.iter();
 
@@ -1168,6 +1174,7 @@ fn check_ipv4_or_registered_name(value: &[u8]) -> bool {
     true
 }
 
+/// Returns true if the byte string contains only valid IPv6 characters.
 fn check_ipv6(value: &[u8]) -> bool {
     for &byte in value {
         if !byte.is_ascii_hexdigit() && byte != b':' {
@@ -1178,6 +1185,8 @@ fn check_ipv6(value: &[u8]) -> bool {
     true
 }
 
+/// Returns true if the byte string contains only valid future IP literal characters. This also
+/// ensures that percent encodings are valid.
 fn check_ipvfuture(value: &[u8]) -> bool {
     for &byte in value {
         match IPV_FUTURE_CHAR_MAP[byte as usize] {
@@ -1189,6 +1198,8 @@ fn check_ipvfuture(value: &[u8]) -> bool {
     true
 }
 
+/// Checks if the user information component contains valid characters and percent encodings. If so,
+/// it will return an `Option<usize>` indicating the separator index for the username and password.
 fn check_user_info(value: &[u8]) -> Result<Option<usize>, InvalidUserInfo> {
     let mut bytes = value.iter().enumerate();
     let mut first_colon_index = None;
@@ -1214,6 +1225,7 @@ fn check_user_info(value: &[u8]) -> Result<Option<usize>, InvalidUserInfo> {
     Ok(first_colon_index)
 }
 
+/// Parses the authority from the given byte string.
 pub(crate) fn parse_authority<'authority>(
     value: &'authority [u8],
 ) -> Result<(Authority<'authority>, &'authority [u8]), InvalidAuthority> {
@@ -1264,6 +1276,7 @@ pub(crate) fn parse_authority<'authority>(
     Ok((authority, rest))
 }
 
+/// Parses the port from the given byte string.
 fn parse_port(value: &[u8]) -> Result<Option<u16>, InvalidPort> {
     if value.is_empty() {
         Ok(None)
@@ -1285,6 +1298,7 @@ fn parse_port(value: &[u8]) -> Result<Option<u16>, InvalidPort> {
     }
 }
 
+/// Parses the user information from the given byte string.
 fn parse_user_info<'user_info>(
     value: &'user_info [u8],
 ) -> Result<(Username<'user_info>, Option<Password<'user_info>>), InvalidUserInfo> {
