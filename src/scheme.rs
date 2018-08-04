@@ -616,6 +616,7 @@ schemes! {
     (GTalk, "gtalk", SchemeStatus::Provisional);
     (H323, "h323", SchemeStatus::Permanent);
     (HAM, "ham", SchemeStatus::Provisional);
+    (HCAP, "hcap", SchemeStatus::Provisional);
     (HCP, "hcp", SchemeStatus::Provisional);
     (HTTP, "http", SchemeStatus::Permanent);
     (HTTPS, "https", SchemeStatus::Permanent);
