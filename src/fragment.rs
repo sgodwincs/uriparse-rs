@@ -60,7 +60,7 @@ impl<'fragment> Fragment<'fragment> {
     /// use uriparse::Fragment;
     ///
     /// let fragment = Fragment::try_from("fragment").unwrap();
-    /// assert_eq!(fragment, "fragment");
+    /// assert_eq!(fragment.as_str(), "fragment");
     /// ```
     pub fn as_str(&self) -> &str {
         &self.0

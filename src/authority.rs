@@ -1,6 +1,30 @@
 //! Authority Component
 //!
 //! See [[RFC3986, Section 3.2](https://tools.ietf.org/html/rfc3986#section-3.2)].
+//!
+//! Note that [`Authority`] contains no mutable methods. If you want to change a part of the
+//! authority, you must use the [`Authority::into_parts`] and [`Authority::from_parts`] functions.
+//!
+//! # Examples
+//!
+//! ```
+//! # #![feature(try_from)]
+//! #
+//! use std::convert::TryFrom;
+//!
+//! use uriparse::Authority;
+//!
+//! let authority = Authority::try_from("example.com").unwrap();
+//! let host = authority.into_parts().2;
+//! let authority =
+//!     Authority::from_parts(Some("username"), Some("password"), host, Some(80)).unwrap();
+//! assert_eq!(authority.to_string(), "username:password@example.com:80");
+//! ```
+//!
+//! # Equality
+//!
+//! Also, while many components in this library support string comparison, [`Authority`] does not.
+//! This comes down to the [`Host`] component being ambiguous on equality.
 
 use std::borrow::Cow;
 use std::convert::TryFrom;

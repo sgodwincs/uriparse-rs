@@ -681,8 +681,6 @@ impl From<InvalidScheme> for InvalidURIReference {
 mod test {
     use super::*;
 
-    use authority::Host;
-
     #[test]
     fn test_parse_uri_reference() {
         let actual = URIReference::try_from("http://example.com").unwrap();
@@ -690,8 +688,8 @@ mod test {
             Some(Scheme::HTTP),
             Some("example.com"),
             "/",
-            None::<&str>,
-            None::<&str>,
+            None::<Query>,
+            None::<Fragment>,
         ).unwrap();
         assert_eq!(actual, expected);
 
@@ -700,8 +698,8 @@ mod test {
             Some(Scheme::HTTP),
             Some("example.com"),
             "/",
-            None::<&str>,
-            None::<&str>,
+            None::<Query>,
+            None::<Fragment>,
         ).unwrap();
         assert_eq!(actual, expected);
 

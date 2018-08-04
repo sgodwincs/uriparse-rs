@@ -73,6 +73,14 @@ impl<'path> Path<'path> {
         self.segments.push(Segment::empty());
     }
 
+    /// Converts the [`Path`] into an owned copy.
+    ///
+    /// If you construct the path from a source with a non-static lifetime, you may run into
+    /// lifetime problems due to the way the struct is designed. Calling this function will ensure
+    /// that the returned value has a static lifetime.
+    ///
+    /// Note that this is different from just cloning. Cloning the path will just copy the
+    /// references, and thus the lifetime will remain the same.
     pub fn into_owned(self) -> Path<'static> {
         let segments = self
             .segments
@@ -86,19 +94,66 @@ impl<'path> Path<'path> {
         }
     }
 
+    /// Returns whether or not the path is absolute (i.e. it starts with a `'/'`).
+    ///
+    /// Note that any path following an [`Authority`] will *always* be parsed to be absolute.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Path;
+    ///
+    /// let path = Path::try_from("/my/path").unwrap();
+    /// assert_eq!(path.is_absolute(), true);
+    /// ```
     pub fn is_absolute(&self) -> bool {
         self.is_absolute
     }
 
+    /// Pops the last segment off of the path.
+    ///
+    /// If the path only contains one segment, then that segment will become empty.
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Path;
+    ///
+    /// let mut path = Path::try_from("/my/path").unwrap();
+    /// path.pop();
+    /// assert_eq!(path, "/my");
+    /// path.pop();
+    /// assert_eq!(path, "/");
+    /// ```
     pub fn pop(&mut self) {
-        if self.segments.len() == 1 {
-            let segment = self.segments.first_mut().unwrap();
-            *segment = Segment("".into());
-        } else {
-            self.segments.pop();
+        self.segments.pop();
+
+        if self.segments.is_empty() {
+            self.segments.push(Segment::empty());
         }
     }
 
+    /// Pushes a segment onto the path.
+    ///
+    /// If the conversion to a [`Segment`] fails, an [`InvalidPath`] will be returned.
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Path;
+    ///
+    /// let mut path = Path::try_from("/my/path").unwrap();
+    /// path.push("test");
+    /// assert_eq!(path, "/my/path/test");
+    /// ```
     pub fn push<S, E>(&mut self, segment: S) -> Result<(), InvalidPath>
     where
         Segment<'path>: TryFrom<S, Error = E>,
@@ -109,10 +164,69 @@ impl<'path> Path<'path> {
         Ok(())
     }
 
+    /// Returns the segments of the path.
+    ///
+    /// If you require mutability, use [`Path::segments_mut`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Path;
+    ///
+    /// let mut path = Path::try_from("/my/path").unwrap();
+    /// assert_eq!(path.segments()[1], "path");
+    /// ```
     pub fn segments(&self) -> &[Segment<'path>] {
         &self.segments
     }
 
+    /// Returns the segments of the path mutably.
+    ///
+    /// Due to the required restriction that there must be at least one segment in a path, this
+    /// mutability only applies to the segments themselves, not the container.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Path, Segment};
+    ///
+    /// let mut path = Path::try_from("/my/path").unwrap();
+    ///
+    /// // TODO: Remove this block once NLL is stable.
+    /// {
+    ///     let mut segments = path.segments_mut();
+    ///     segments[1] = Segment::try_from("test").unwrap();
+    /// }
+    ///
+    /// assert_eq!(path, "/my/test");
+    /// ```
+    pub fn segments_mut(&mut self) -> &mut [Segment<'path>] {
+        &mut self.segments
+    }
+
+    /// Sets whether or not the path is absolute (i.e. it starts with a `'/'`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Path;
+    ///
+    /// let mut path = Path::try_from("/my/path").unwrap();
+    /// path.set_absolute(false);
+    /// assert_eq!(path, "my/path");
+    /// ```
     pub fn set_absolute(&mut self, absolute: bool) {
         self.is_absolute = absolute;
     }
@@ -133,6 +247,12 @@ impl<'path> Display for Path<'path> {
         }
 
         Ok(())
+    }
+}
+
+impl<'path> From<Path<'path>> for String {
+    fn from(value: Path<'path>) -> String {
+        value.to_string()
     }
 }
 
@@ -238,18 +358,52 @@ impl<'path> TryFrom<&'path str> for Path<'path> {
     }
 }
 
+/// A segment of a path.
+///
+/// Segments are separated from other segments with the `'/'` delimiter.
 #[derive(Clone, Debug)]
 pub struct Segment<'segment>(Cow<'segment, str>);
 
 impl<'segment> Segment<'segment> {
+    /// Returns a `str` representation of the segment.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Segment;
+    ///
+    /// let segment = Segment::try_from("segment").unwrap();
+    /// assert_eq!(segment.as_str(), "segment");
+    /// ```
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
+    /// Constructs a segment that is empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use uriparse::Segment;
+    ///
+    /// assert_eq!(Segment::empty(),  "");
+    /// ```
     pub fn empty() -> Segment<'static> {
         Segment(Cow::from(""))
     }
 
+    /// Converts the [`Segment`] into an owned copy.
+    ///
+    /// If you construct the segment from a source with a non-static lifetime, you may run into
+    /// lifetime problems due to the way the struct is designed. Calling this function will ensure
+    /// that the returned value has a static lifetime.
+    ///
+    /// Note that this is different from just cloning. Cloning the segment will just copy the
+    /// references, and thus the lifetime will remain the same.
     pub fn into_owned(self) -> Segment<'static> {
         Segment(Cow::from(self.0.into_owned()))
     }
@@ -282,6 +436,12 @@ impl<'segment> Display for Segment<'segment> {
 }
 
 impl<'segment> Eq for Segment<'segment> {}
+
+impl<'segment> From<Segment<'segment>> for String {
+    fn from(value: Segment<'segment>) -> String {
+        value.to_string()
+    }
+}
 
 impl<'segment> Hash for Segment<'segment> {
     fn hash<H>(&self, state: &mut H)
@@ -380,10 +540,20 @@ impl<'segment> TryFrom<&'segment str> for Segment<'segment> {
     }
 }
 
+/// An error representing an invalid path.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum InvalidPath {
+    /// This error occurs when the string from which the path is parsed is not entirely consumed
+    /// during the parsing. For example, parsing the string `"/my/path?query"` would generate
+    /// this error since `"?query"` would still be left over.
+    ///
+    /// Note that this only applies to the [`Path::try_from`] functions.
     ExpectedEOF,
+
+    /// The path contained an invalid character.
     InvalidCharacter,
+
+    /// The path contained an invalid percent encoding (e.g. `"%zz"`).
     InvalidPercentEncoding,
 }
 
@@ -405,6 +575,7 @@ impl Error for InvalidPath {
     }
 }
 
+/// Parses the path from the given byte string.
 pub(crate) fn parse_path<'path>(
     value: &'path [u8],
 ) -> Result<(Path<'path>, &'path [u8]), InvalidPath> {
@@ -421,6 +592,8 @@ pub(crate) fn parse_path<'path>(
     let mut bytes = value.iter();
     let mut segment_end_index = 0;
     let mut segment_start_index = 0;
+
+    // Set some moderate initial capacity. This seems to help with performance a bit.
     let mut segments = Vec::with_capacity(10);
 
     while let Some(&byte) = bytes.next() {
