@@ -1,6 +1,6 @@
 //! Scheme Component
 //!
-//! See [[RFC3986, Section 3.5](https://tools.ietf.org/html/rfc3986#section-3.1)]. For a list of
+//! See [[RFC3986, Section 3.5](https://tools.ietf.org/html/rfc3986#section-3.5)]. For a list of
 //! the listed schemes, see
 //! [iana.org](https://www.iana.org/assignments/uri-schemes/uri-schemes.xhtml).
 
@@ -62,7 +62,7 @@ macro_rules! schemes {
         }
 
         /// The scheme component as defined in
-        /// [[RFC3986, Section 3.5](https://tools.ietf.org/html/rfc3986#section-3.2)]. The schemes
+        /// [[RFC3986, Section 3.5](https://tools.ietf.org/html/rfc3986#section-3.5)]. The schemes
         /// listed here come from
         /// [iana.org](https://www.iana.org/assignments/uri-schemes/uri-schemes.xhtml). Any scheme
         /// not listed there is considered unregistered and will be contained in

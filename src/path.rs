@@ -1,3 +1,7 @@
+//! Path Component
+//!
+//! See [[RFC3986, Section 3.3](https://tools.ietf.org/html/rfc3986#section-3.3)].
+
 use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::error::Error;
@@ -6,8 +10,9 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::str;
 
-use utility::{percent_encoded_hash, percent_encoded_string_equality};
+use utility::{percent_encoded_equality, percent_encoded_hash};
 
+/// A map of byte characters that determines if a character is a valid path character.
 #[cfg_attr(rustfmt, rustfmt_skip)]
 const PATH_CHAR_MAP: [u8; 256] = [
  // 0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F
@@ -29,15 +34,43 @@ const PATH_CHAR_MAP: [u8; 256] = [
     0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0, // F
 ];
 
+/// The path component as defined in
+/// [[RFC3986, Section 3.3](https://tools.ietf.org/html/rfc3986#section-3.3)].
+///
+/// A path is composed of a sequence of segments. It is also either absolute or relative, where an
+/// absolute path starts with a `'/'`. Note that a URI with an authority *always* has an absolute
+/// path regardless of whether or not the path was empty (i.e. "http://example.com" has a single
+/// empty path segment and is absolute).
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Path<'path> {
+    /// Whether or not the path is absolute. Specifically, a path is absolute if it starts with a
+    /// `'/'`.
     is_absolute: bool,
+
+    /// The sequence of segments that compose the path.
     segments: Vec<Segment<'path>>,
 }
 
 impl<'path> Path<'path> {
+    /// Clears all segments from the path leaving a single empty segment.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Path;
+    ///
+    /// let mut path = Path::try_from("/my/path").unwrap();
+    /// assert_eq!(path, "/my/path");
+    /// path.clear();
+    /// assert_eq!(path, "/");
+    /// ```
     pub fn clear(&mut self) {
         self.segments.clear();
+        self.segments.push(Segment::empty());
     }
 
     pub fn into_owned(self) -> Path<'static> {
@@ -103,6 +136,86 @@ impl<'path> Display for Path<'path> {
     }
 }
 
+impl<'path> PartialEq<[u8]> for Path<'path> {
+    fn eq(&self, mut other: &[u8]) -> bool {
+        if self.is_absolute {
+            match other.get(0) {
+                Some(&byte) => if byte != b'/' {
+                    return false;
+                },
+                None => return false,
+            }
+
+            other = &other[1..];
+        }
+
+        for (index, segment) in self.segments.iter().enumerate() {
+            let len = segment.as_str().len();
+
+            if other.len() < len || &other[..len] != segment {
+                return false;
+            }
+
+            other = &other[len..];
+
+            if index < self.segments.len() - 1 {
+                match other.get(0) {
+                    Some(&byte) => if byte != b'/' {
+                        return false;
+                    },
+                    None => return false,
+                }
+
+                other = &other[1..];
+            }
+        }
+
+        return true;
+    }
+}
+
+impl<'path> PartialEq<Path<'path>> for [u8] {
+    fn eq(&self, other: &Path<'path>) -> bool {
+        self == other
+    }
+}
+
+impl<'a, 'path> PartialEq<&'a [u8]> for Path<'path> {
+    fn eq(&self, other: &&'a [u8]) -> bool {
+        self == *other
+    }
+}
+
+impl<'a, 'path> PartialEq<Path<'path>> for &'a [u8] {
+    fn eq(&self, other: &Path<'path>) -> bool {
+        self == other
+    }
+}
+
+impl<'path> PartialEq<str> for Path<'path> {
+    fn eq(&self, other: &str) -> bool {
+        self == other.as_bytes()
+    }
+}
+
+impl<'path> PartialEq<Path<'path>> for str {
+    fn eq(&self, other: &Path<'path>) -> bool {
+        self.as_bytes() == other
+    }
+}
+
+impl<'a, 'path> PartialEq<&'a str> for Path<'path> {
+    fn eq(&self, other: &&'a str) -> bool {
+        self == other.as_bytes()
+    }
+}
+
+impl<'a, 'path> PartialEq<Path<'path>> for &'a str {
+    fn eq(&self, other: &Path<'path>) -> bool {
+        self.as_bytes() == other
+    }
+}
+
 impl<'path> TryFrom<&'path [u8]> for Path<'path> {
     type Error = InvalidPath;
 
@@ -131,6 +244,10 @@ pub struct Segment<'segment>(Cow<'segment, str>);
 impl<'segment> Segment<'segment> {
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+
+    pub fn empty() -> Segment<'static> {
+        Segment(Cow::from(""))
     }
 
     pub fn into_owned(self) -> Segment<'static> {
@@ -171,37 +288,61 @@ impl<'segment> Hash for Segment<'segment> {
     where
         H: Hasher,
     {
-        percent_encoded_hash(&self.0, state, true);
+        percent_encoded_hash(self.0.as_bytes(), state, true);
     }
 }
 
 impl<'segment> PartialEq for Segment<'segment> {
     fn eq(&self, other: &Segment) -> bool {
-        percent_encoded_string_equality(&self.0, &other.0, true)
+        percent_encoded_equality(self.0.as_bytes(), other.0.as_bytes(), true)
+    }
+}
+
+impl<'segment> PartialEq<[u8]> for Segment<'segment> {
+    fn eq(&self, other: &[u8]) -> bool {
+        percent_encoded_equality(self.0.as_bytes(), other, true)
+    }
+}
+
+impl<'segment> PartialEq<Segment<'segment>> for [u8] {
+    fn eq(&self, other: &Segment<'segment>) -> bool {
+        percent_encoded_equality(self, other.0.as_bytes(), true)
+    }
+}
+
+impl<'a, 'segment> PartialEq<&'a [u8]> for Segment<'segment> {
+    fn eq(&self, other: &&'a [u8]) -> bool {
+        percent_encoded_equality(self.0.as_bytes(), other, true)
+    }
+}
+
+impl<'a, 'segment> PartialEq<Segment<'segment>> for &'a [u8] {
+    fn eq(&self, other: &Segment<'segment>) -> bool {
+        percent_encoded_equality(self, other.0.as_bytes(), true)
     }
 }
 
 impl<'segment> PartialEq<str> for Segment<'segment> {
     fn eq(&self, other: &str) -> bool {
-        percent_encoded_string_equality(&self.0, other, true)
+        percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), true)
     }
 }
 
 impl<'segment> PartialEq<Segment<'segment>> for str {
     fn eq(&self, other: &Segment<'segment>) -> bool {
-        percent_encoded_string_equality(self, &other.0, true)
+        percent_encoded_equality(self.as_bytes(), other.0.as_bytes(), true)
     }
 }
 
 impl<'a, 'segment> PartialEq<&'a str> for Segment<'segment> {
     fn eq(&self, other: &&'a str) -> bool {
-        percent_encoded_string_equality(&self.0, *other, true)
+        percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), true)
     }
 }
 
 impl<'a, 'segment> PartialEq<Segment<'segment>> for &'a str {
     fn eq(&self, other: &Segment<'segment>) -> bool {
-        percent_encoded_string_equality(self, &other.0, true)
+        percent_encoded_equality(self.as_bytes(), other.0.as_bytes(), true)
     }
 }
 

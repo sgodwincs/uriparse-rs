@@ -11,7 +11,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::ops::Deref;
 use std::str;
 
-use utility::{percent_encoded_hash, percent_encoded_string_equality};
+use utility::{percent_encoded_equality, percent_encoded_hash};
 
 /// A map of byte characters that determines if a character is a valid IPv4 or registered name
 /// character.
@@ -88,7 +88,7 @@ const USER_INFO_CHAR_MAP: [u8; 256] = [
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Authority<'authority> {
     /// The host component of the authority as defined in
-    /// [[RFC3986, Section 3.2.2](https://tools.ietf.org/html/rfc3986#section-3.2.1)].
+    /// [[RFC3986, Section 3.2.2](https://tools.ietf.org/html/rfc3986#section-3.2.2)].
     host: Host<'authority>,
 
     /// The password component of the authority as defined in
@@ -96,7 +96,7 @@ pub struct Authority<'authority> {
     password: Option<Password<'authority>>,
 
     /// The port component of the authority as defined in
-    /// [[RFC3986, Section 3.2.3](https://tools.ietf.org/html/rfc3986#section-3.2.1)].
+    /// [[RFC3986, Section 3.2.3](https://tools.ietf.org/html/rfc3986#section-3.2.3)].
     port: Option<u16>,
 
     /// The username component of the authority as defined in
@@ -416,7 +416,7 @@ impl<'authority> TryFrom<&'authority str> for Authority<'authority> {
 }
 
 /// The host component of the authority as defined in
-/// [[RFC3986, Section 3.2.2](https://tools.ietf.org/html/rfc3986#section-3.2.1)].
+/// [[RFC3986, Section 3.2.2](https://tools.ietf.org/html/rfc3986#section-3.2.2)].
 ///
 /// Note that the RFC mentions support for future IP address literals. Of course, as of this moment
 /// there exist none, so hosts of the form `"[v*...]"` where `'*'` is a hexadecimal digit and
@@ -698,37 +698,61 @@ impl<'password> Hash for Password<'password> {
     where
         H: Hasher,
     {
-        percent_encoded_hash(&self.0, state, true);
+        percent_encoded_hash(self.0.as_bytes(), state, true);
     }
 }
 
 impl<'password> PartialEq for Password<'password> {
     fn eq(&self, other: &Password) -> bool {
-        percent_encoded_string_equality(&self.0, &other.0, true)
+        percent_encoded_equality(self.0.as_bytes(), other.0.as_bytes(), true)
+    }
+}
+
+impl<'password> PartialEq<[u8]> for Password<'password> {
+    fn eq(&self, other: &[u8]) -> bool {
+        percent_encoded_equality(self.0.as_bytes(), other, true)
+    }
+}
+
+impl<'password> PartialEq<Password<'password>> for [u8] {
+    fn eq(&self, other: &Password<'password>) -> bool {
+        percent_encoded_equality(self, other.0.as_bytes(), true)
+    }
+}
+
+impl<'a, 'password> PartialEq<&'a [u8]> for Password<'password> {
+    fn eq(&self, other: &&'a [u8]) -> bool {
+        percent_encoded_equality(self.0.as_bytes(), other, true)
+    }
+}
+
+impl<'a, 'password> PartialEq<Password<'password>> for &'a [u8] {
+    fn eq(&self, other: &Password<'password>) -> bool {
+        percent_encoded_equality(self, other.0.as_bytes(), true)
     }
 }
 
 impl<'password> PartialEq<str> for Password<'password> {
     fn eq(&self, other: &str) -> bool {
-        percent_encoded_string_equality(&self.0, other, true)
+        percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), true)
     }
 }
 
 impl<'password> PartialEq<Password<'password>> for str {
     fn eq(&self, other: &Password<'password>) -> bool {
-        percent_encoded_string_equality(self, &other.0, true)
+        percent_encoded_equality(self.as_bytes(), other.0.as_bytes(), true)
     }
 }
 
 impl<'a, 'password> PartialEq<&'a str> for Password<'password> {
     fn eq(&self, other: &&'a str) -> bool {
-        percent_encoded_string_equality(&self.0, *other, true)
+        percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), true)
     }
 }
 
 impl<'a, 'password> PartialEq<Password<'password>> for &'a str {
     fn eq(&self, other: &Password<'password>) -> bool {
-        percent_encoded_string_equality(self, &other.0, true)
+        percent_encoded_equality(self.as_bytes(), other.0.as_bytes(), true)
     }
 }
 
@@ -804,37 +828,61 @@ impl<'name> Hash for RegisteredName<'name> {
     where
         H: Hasher,
     {
-        percent_encoded_hash(&self.0, state, false);
+        percent_encoded_hash(self.0.as_bytes(), state, false);
     }
 }
 
 impl<'name> PartialEq for RegisteredName<'name> {
     fn eq(&self, other: &RegisteredName) -> bool {
-        percent_encoded_string_equality(&self.0, &other.0, false)
+        percent_encoded_equality(self.0.as_bytes(), other.0.as_bytes(), false)
+    }
+}
+
+impl<'name> PartialEq<[u8]> for RegisteredName<'name> {
+    fn eq(&self, other: &[u8]) -> bool {
+        percent_encoded_equality(self.0.as_bytes(), other, false)
+    }
+}
+
+impl<'name> PartialEq<RegisteredName<'name>> for [u8] {
+    fn eq(&self, other: &RegisteredName<'name>) -> bool {
+        percent_encoded_equality(self, other.0.as_bytes(), false)
+    }
+}
+
+impl<'a, 'name> PartialEq<&'a [u8]> for RegisteredName<'name> {
+    fn eq(&self, other: &&'a [u8]) -> bool {
+        percent_encoded_equality(self.0.as_bytes(), other, false)
+    }
+}
+
+impl<'a, 'name> PartialEq<RegisteredName<'name>> for &'a [u8] {
+    fn eq(&self, other: &RegisteredName<'name>) -> bool {
+        percent_encoded_equality(self, other.0.as_bytes(), false)
     }
 }
 
 impl<'name> PartialEq<str> for RegisteredName<'name> {
     fn eq(&self, other: &str) -> bool {
-        percent_encoded_string_equality(&self.0, other, false)
+        percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), false)
     }
 }
 
 impl<'name> PartialEq<RegisteredName<'name>> for str {
     fn eq(&self, other: &RegisteredName<'name>) -> bool {
-        percent_encoded_string_equality(self, &other.0, false)
+        percent_encoded_equality(self.as_bytes(), other.0.as_bytes(), false)
     }
 }
 
 impl<'a, 'name> PartialEq<&'a str> for RegisteredName<'name> {
     fn eq(&self, other: &&'a str) -> bool {
-        percent_encoded_string_equality(&self.0, *other, false)
+        percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), false)
     }
 }
 
 impl<'a, 'name> PartialEq<RegisteredName<'name>> for &'a str {
     fn eq(&self, other: &RegisteredName<'name>) -> bool {
-        percent_encoded_string_equality(self, &other.0, false)
+        percent_encoded_equality(self.as_bytes(), other.0.as_bytes(), false)
     }
 }
 
@@ -919,37 +967,61 @@ impl<'username> Hash for Username<'username> {
     where
         H: Hasher,
     {
-        percent_encoded_hash(&self.0, state, true);
+        percent_encoded_hash(self.0.as_bytes(), state, true);
     }
 }
 
 impl<'username> PartialEq for Username<'username> {
     fn eq(&self, other: &Username) -> bool {
-        percent_encoded_string_equality(&self.0, &other.0, true)
+        percent_encoded_equality(self.0.as_bytes(), other.0.as_bytes(), true)
+    }
+}
+
+impl<'username> PartialEq<[u8]> for Username<'username> {
+    fn eq(&self, other: &[u8]) -> bool {
+        percent_encoded_equality(self.0.as_bytes(), other, true)
+    }
+}
+
+impl<'username> PartialEq<Username<'username>> for [u8] {
+    fn eq(&self, other: &Username<'username>) -> bool {
+        percent_encoded_equality(self, other.as_bytes(), true)
+    }
+}
+
+impl<'a, 'username> PartialEq<&'a [u8]> for Username<'username> {
+    fn eq(&self, other: &&'a [u8]) -> bool {
+        percent_encoded_equality(self.0.as_bytes(), other, true)
+    }
+}
+
+impl<'a, 'username> PartialEq<Username<'username>> for &'a [u8] {
+    fn eq(&self, other: &Username<'username>) -> bool {
+        percent_encoded_equality(self, other.as_bytes(), true)
     }
 }
 
 impl<'username> PartialEq<str> for Username<'username> {
     fn eq(&self, other: &str) -> bool {
-        percent_encoded_string_equality(&self.0, other, true)
+        percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), true)
     }
 }
 
 impl<'username> PartialEq<Username<'username>> for str {
     fn eq(&self, other: &Username<'username>) -> bool {
-        percent_encoded_string_equality(self, &other.0, true)
+        percent_encoded_equality(self.as_bytes(), other.0.as_bytes(), true)
     }
 }
 
 impl<'a, 'username> PartialEq<&'a str> for Username<'username> {
     fn eq(&self, other: &&'a str) -> bool {
-        percent_encoded_string_equality(&self.0, *other, true)
+        percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), true)
     }
 }
 
 impl<'a, 'username> PartialEq<Username<'username>> for &'a str {
     fn eq(&self, other: &Username<'username>) -> bool {
-        percent_encoded_string_equality(self, &other.0, true)
+        percent_encoded_equality(self.as_bytes(), other.0.as_bytes(), true)
     }
 }
 

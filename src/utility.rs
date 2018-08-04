@@ -20,11 +20,11 @@ fn hex_digit_to_decimal(digit: u8) -> Result<u8, ()> {
     }
 }
 
-pub fn percent_encoded_hash<H>(value: &str, state: &mut H, case_sensitive: bool)
+pub fn percent_encoded_hash<H>(value: &[u8], state: &mut H, case_sensitive: bool)
 where
     H: Hasher,
 {
-    let mut bytes = value.bytes();
+    let mut bytes = value.iter();
     let mut length = 0;
 
     while let Some(byte) = bytes.next() {
@@ -32,8 +32,8 @@ where
 
         match byte {
             b'%' => {
-                let first_digit = bytes.next();
-                let second_digit = bytes.next();
+                let first_digit = bytes.next().cloned();
+                let second_digit = bytes.next().cloned();
                 let hex_value = get_percent_encoded_value(first_digit, second_digit).unwrap();
                 hex_value.hash(state);
             }
@@ -48,16 +48,16 @@ where
     length.hash(state);
 }
 
-pub fn percent_encoded_string_equality(left: &str, right: &str, case_sensitive: bool) -> bool {
-    let mut left_bytes = left.bytes();
-    let mut right_bytes = right.bytes();
+pub fn percent_encoded_equality(left: &[u8], right: &[u8], case_sensitive: bool) -> bool {
+    let mut left_bytes = left.iter();
+    let mut right_bytes = right.iter();
 
     loop {
         match (left_bytes.next(), right_bytes.next()) {
             (Some(b'%'), Some(b'%')) => (),
-            (Some(b'%'), Some(right_byte)) => {
-                let first_digit = left_bytes.next();
-                let second_digit = left_bytes.next();
+            (Some(b'%'), Some(&right_byte)) => {
+                let first_digit = left_bytes.next().cloned();
+                let second_digit = left_bytes.next().cloned();
 
                 match get_percent_encoded_value(first_digit, second_digit) {
                     Ok(hex_value) if hex_value != right_byte => return false,
@@ -65,9 +65,9 @@ pub fn percent_encoded_string_equality(left: &str, right: &str, case_sensitive: 
                     _ => (),
                 }
             }
-            (Some(left_byte), Some(b'%')) => {
-                let first_digit = right_bytes.next();
-                let second_digit = right_bytes.next();
+            (Some(&left_byte), Some(b'%')) => {
+                let first_digit = right_bytes.next().cloned();
+                let second_digit = right_bytes.next().cloned();
 
                 match get_percent_encoded_value(first_digit, second_digit) {
                     Ok(hex_value) if hex_value != left_byte => return false,

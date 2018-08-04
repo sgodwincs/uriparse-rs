@@ -24,6 +24,10 @@ impl<'uri> URI<'uri> {
         self.uri_reference.authority()
     }
 
+    pub fn can_be_a_base(&self) -> bool {
+        !self.uri_reference.has_fragment()
+    }
+
     pub fn from_parts<
         'new_uri,
         SchemeType,
@@ -87,6 +91,13 @@ impl<'uri> URI<'uri> {
 
     pub fn host(&self) -> Option<&Host<'uri>> {
         self.uri_reference.host()
+    }
+
+    pub fn into_base_uri(self) -> URI<'uri> {
+        let (scheme, authority, path, query, _) = self.uri_reference.into_parts();
+        let uri_reference =
+            URIReference::from_parts(scheme, authority, path, query, None::<Fragment>).unwrap();
+        URI { uri_reference }
     }
 
     pub fn into_owned(self) -> URI<'static> {
@@ -361,10 +372,6 @@ impl<'uri> URIReference<'uri> {
         )
     }
 
-    pub fn is_absolute(&self) -> bool {
-        self.scheme.is_some()
-    }
-
     pub fn is_absolute_path_reference(&self) -> bool {
         self.scheme.is_none() && self.authority.is_none() && self.path.is_absolute()
     }
@@ -381,11 +388,8 @@ impl<'uri> URIReference<'uri> {
         self.scheme.is_none()
     }
 
-    pub fn is_same_document_reference<'other_uri>(&self, other: &URIReference<'other_uri>) -> bool {
-        self.scheme == other.scheme
-            && self.authority == other.authority
-            && self.path == other.path
-            && self.query == other.query
+    pub fn is_uri(&self) -> bool {
+        self.scheme.is_some()
     }
 
     pub fn path(&self) -> &Path<'uri> {

@@ -6,7 +6,7 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::str;
 
-use utility::{percent_encoded_hash, percent_encoded_string_equality};
+use utility::{percent_encoded_equality, percent_encoded_hash};
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
 const QUERY_CHAR_MAP: [u8; 256] = [
@@ -75,37 +75,61 @@ impl<'query> Hash for Query<'query> {
     where
         H: Hasher,
     {
-        percent_encoded_hash(&self.0, state, true);
+        percent_encoded_hash(self.0.as_bytes(), state, true);
     }
 }
 
 impl<'query> PartialEq for Query<'query> {
     fn eq(&self, other: &Query) -> bool {
-        percent_encoded_string_equality(&self.0, &other.0, true)
+        percent_encoded_equality(self.0.as_bytes(), other.0.as_bytes(), true)
+    }
+}
+
+impl<'query> PartialEq<[u8]> for Query<'query> {
+    fn eq(&self, other: &[u8]) -> bool {
+        percent_encoded_equality(self.0.as_bytes(), other, true)
+    }
+}
+
+impl<'query> PartialEq<Query<'query>> for [u8] {
+    fn eq(&self, other: &Query<'query>) -> bool {
+        percent_encoded_equality(self, other.0.as_bytes(), true)
+    }
+}
+
+impl<'a, 'query> PartialEq<&'a [u8]> for Query<'query> {
+    fn eq(&self, other: &&'a [u8]) -> bool {
+        percent_encoded_equality(self.0.as_bytes(), other, true)
+    }
+}
+
+impl<'a, 'query> PartialEq<Query<'query>> for &'a [u8] {
+    fn eq(&self, other: &Query<'query>) -> bool {
+        percent_encoded_equality(self, other.0.as_bytes(), true)
     }
 }
 
 impl<'query> PartialEq<str> for Query<'query> {
     fn eq(&self, other: &str) -> bool {
-        percent_encoded_string_equality(&self.0, other, true)
+        percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), true)
     }
 }
 
 impl<'query> PartialEq<Query<'query>> for str {
     fn eq(&self, other: &Query<'query>) -> bool {
-        percent_encoded_string_equality(self, &other.0, true)
+        percent_encoded_equality(self.as_bytes(), other.0.as_bytes(), true)
     }
 }
 
 impl<'a, 'query> PartialEq<&'a str> for Query<'query> {
     fn eq(&self, other: &&'a str) -> bool {
-        percent_encoded_string_equality(&self.0, *other, true)
+        percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), true)
     }
 }
 
 impl<'a, 'query> PartialEq<Query<'query>> for &'a str {
     fn eq(&self, other: &Query<'query>) -> bool {
-        percent_encoded_string_equality(self, &other.0, true)
+        percent_encoded_equality(self.as_bytes(), other.0.as_bytes(), true)
     }
 }
 
