@@ -82,9 +82,9 @@ macro_rules! schemes {
         impl<'scheme> Scheme<'scheme> {
             /// Returns a `str` representation of the scheme.
             ///
-            /// Note that the case of the scheme will be lowercase if it was a registered scheme.
-            /// Otherwise, the string representation will be exactly that of the original string
-            /// including case-sensitivity.
+            /// The case of the scheme will be lowercase if it was a registered scheme. Otherwise,
+            /// the string representation will be exactly that of the original string including
+            /// case-sensitivity.
             ///
             /// # Examples
             ///
@@ -117,7 +117,7 @@ macro_rules! schemes {
             /// into lifetime problems due to the way it is designed. Calling this function will
             /// ensure that the returned value has a static lifetime.
             ///
-            /// Note that this is different from just cloning. Cloning the scheme will just copy the
+            /// This is different from just cloning. Cloning the scheme will just copy the
             /// references (in the case of an unregistered scheme), and thus the lifetime will
             /// remain the same.
             pub fn into_owned(self) -> Scheme<'static> {
@@ -155,6 +155,8 @@ macro_rules! schemes {
         /// Parses the scheme from the given byte string.
         pub(crate) fn parse_scheme(value: &[u8]) -> Result<(Scheme, &[u8]), InvalidScheme> {
             fn unregistered_scheme<'bytes>(value: &'bytes [u8]) -> Scheme<'bytes> {
+                // Unsafe: The loop below makes sure this is safe.
+
                 let scheme = unsafe { str::from_utf8_unchecked(value) };
                 Scheme::Unregistered(UnregisteredScheme(Cow::from(scheme)))
             }
@@ -273,14 +275,14 @@ impl<'scheme> TryFrom<&'scheme str> for Scheme<'scheme> {
 /// A scheme that is not in the
 /// [registered schemes](https://www.iana.org/assignments/uri-schemes/uri-schemes.xhtml).
 ///
-/// Note that this is case-insensitive, and this is reflected in the equality and hash functions.
+/// This is case-insensitive, and this is reflected in the equality and hash functions.
 #[derive(Clone, Debug)]
 pub struct UnregisteredScheme<'scheme>(Cow<'scheme, str>);
 
 impl<'scheme> UnregisteredScheme<'scheme> {
     /// Returns a `str` representation of the scheme.
     ///
-    /// Note that the case-sensitivity of the original string is preserved.
+    /// The case-sensitivity of the original string is preserved.
     ///
     /// # Examples
     ///
@@ -304,8 +306,8 @@ impl<'scheme> UnregisteredScheme<'scheme> {
     /// lifetime problems due to the way the struct is designed. Calling this function will ensure
     /// that the returned value has a static lifetime.
     ///
-    /// Note that this is different from just cloning. Cloning the scheme will just copy the
-    /// references, and thus the lifetime will remain the same.
+    /// This is different from just cloning. Cloning the scheme will just copy the references, and
+    /// thus the lifetime will remain the same.
     pub fn into_owned(self) -> UnregisteredScheme<'static> {
         UnregisteredScheme(Cow::from(self.0.into_owned()))
     }
@@ -405,7 +407,7 @@ pub enum InvalidScheme {
     /// during the parsing. For example, parsing the string `"http:"` would generate
     /// this error since `":"` would still be left over.
     ///
-    /// Note that this only applies to the [`Scheme::try_from`] functions.
+    /// This only applies to the [`Scheme::try_from`] functions.
     ExpectedEOF,
 
     /// The scheme contained an invalid scheme character.

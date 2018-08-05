@@ -2,8 +2,8 @@
 //!
 //! See [[RFC3986, Section 3.2](https://tools.ietf.org/html/rfc3986#section-3.2)].
 //!
-//! Note that [`Authority`] contains no mutable methods. If you want to change a part of the
-//! authority, you must use the [`Authority::into_parts`] and [`Authority::from_parts`] functions.
+//! [`Authority`] contains no mutable methods. If you want to change a part of the authority, you
+//! must use the [`Authority::into_parts`] and [`Authority::from_parts`] functions.
 //!
 //! # Examples
 //!
@@ -23,8 +23,9 @@
 //!
 //! # Equality
 //!
-//! Also, while many components in this library support string comparison, [`Authority`] does not.
-//! This comes down to the [`Host`] component being ambiguous on equality.
+//! While many components in this library support string comparison, [`Authority`] does not. This
+//! comes down to the [`Host`] component being ambiguous on equality (e.g. comparing IPv4 and IPv6
+//! addresses).
 
 use std::borrow::Cow;
 use std::convert::TryFrom;
@@ -107,8 +108,8 @@ const USER_INFO_CHAR_MAP: [u8; 256] = [
 /// The authority component as defined in
 /// [[RFC3986, Section 3.2](https://tools.ietf.org/html/rfc3986#section-3.2)].
 ///
-/// Note that any conversions to a string will **not** hide the password component of the authority.
-/// Be careful if you decide to perform logging.
+/// Any conversions to a string will **not** hide the password component of the authority. Be
+/// careful if you decide to perform logging.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Authority<'authority> {
     /// The host component of the authority as defined in
@@ -132,8 +133,8 @@ impl<'authority> Authority<'authority> {
     /// Constructs a new [`Authority`] from the individual parts: username, password, host, and
     /// port.
     ///
-    /// Note that the lifetime used by the resulting value will be the lifetime of the parts that
-    /// is most restricted in scope.
+    /// The lifetime used by the resulting value will be the lifetime of the part that is most
+    /// restricted in scope.
     ///
     /// # Examples
     ///
@@ -195,8 +196,8 @@ impl<'authority> Authority<'authority> {
     /// Returns whether or not there is a password in the authority as defined in
     /// [[RFC3986, Section 3.2.1](https://tools.ietf.org/html/rfc3986#section-3.2.1)].
     ///
-    /// Note that there will only be a password if the URI has a user information component *and*
-    /// the component contains the `':'` delimiter.
+    /// There will only be a password if the URI has a user information component *and* the
+    /// component contains the `':'` delimiter.
     ///
     /// # Examples
     ///
@@ -217,8 +218,8 @@ impl<'authority> Authority<'authority> {
     /// Returns whether or not there is a username in the authority as defined in
     /// [[RFC3986, Section 3.2.1](https://tools.ietf.org/html/rfc3986#section-3.2.1)].
     ///
-    /// Note that there will *always* be a username as long as there is a `'@'` delimiter present
-    /// in the URI.
+    /// There will *always* be a username as long as there is a `'@'` delimiter present in the
+    /// authority.
     ///
     /// # Examples
     ///
@@ -264,8 +265,8 @@ impl<'authority> Authority<'authority> {
     /// lifetime problems due to the way the struct is designed. Calling this function will ensure
     /// that the returned value has a static lifetime.
     ///
-    /// Note that this is different from just cloning. Cloning the authority will just copy the
-    /// references, and thus the lifetime will remain the same.
+    /// This is different from just cloning. Cloning the authority will just copy the eferences, and
+    /// thus the lifetime will remain the same.
     pub fn into_owned(self) -> Authority<'static> {
         let password = self.password.map(|password| password.into_owned());
         let username = self.username.map(|username| username.into_owned());
@@ -442,9 +443,9 @@ impl<'authority> TryFrom<&'authority str> for Authority<'authority> {
 /// The host component of the authority as defined in
 /// [[RFC3986, Section 3.2.2](https://tools.ietf.org/html/rfc3986#section-3.2.2)].
 ///
-/// Note that the RFC mentions support for future IP address literals. Of course, as of this moment
-/// there exist none, so hosts of the form `"[v*...]"` where `'*'` is a hexadecimal digit and
-/// `'...'` is the actual IP literal are not considered valid.
+/// The RFC mentions support for future IP address literals. Of course, as of this moment there
+/// exist none, so hosts of the form `"[v*...]"` where `'*'` is a hexadecimal digit and `'...'` is the
+/// actual IP literal are not considered valid.
 ///
 /// Also, the host is case-insensitive meaning that `"example.com"` and `"ExAmPlE.CoM"` refer to the
 /// same host. Furthermore, percent-encoding plays no role in equality checking meaning that
@@ -456,16 +457,18 @@ impl<'authority> TryFrom<&'authority str> for Authority<'authority> {
 /// will always be preserved as is with no normalization performed.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Host<'host> {
-    /// An IPv4 address.
+    /// An IPv4 address. Based on the `std`'s implementation, leading zeros for octets are allowed
+    /// for up to three digits. So for example, `"000.000.000.000"` is still considered a valid IPv4
+    /// address, but `"000.000.000.0000"` is not. Thus, it would be considered a registered name.
     IPv4Address(Ipv4Addr),
 
-    /// An IPv6 address. Note that this will always be encased in brackets (`'['` and `']'`).
+    /// An IPv6 address. This will always be encased in brackets (`'['` and `']'`).
     IPv6Address(Ipv6Addr),
 
-    /// Any other host that does not follow the syntax of an IP address. Note that this includes
-    /// even hosts of the form `"999.999.999.999"`. One might expect this to produce an invalid
-    /// IPv4 error, but the RFC states that it is a "first-match-wins" algorithm, and that host does
-    /// not match the IPv4 literal syntax.
+    /// Any other host that does not follow the syntax of an IP address. This includes even hosts of
+    /// the form `"999.999.999.999"`. One might expect this to produce an invalid IPv4 error, but
+    /// the RFC states that it is a "first-match-wins" algorithm, and that host does not match the
+    /// IPv4 literal syntax.
     ///
     /// This may be changed in the future, since arguments can be made from either side.
     RegisteredName(RegisteredName<'host>),
@@ -563,6 +566,18 @@ impl From<IpAddr> for Host<'static> {
     }
 }
 
+impl From<Ipv4Addr> for Host<'static> {
+    fn from(value: Ipv4Addr) -> Self {
+        Host::IPv4Address(value)
+    }
+}
+
+impl From<Ipv6Addr> for Host<'static> {
+    fn from(value: Ipv6Addr) -> Self {
+        Host::IPv6Address(value)
+    }
+}
+
 impl<'host> TryFrom<&'host [u8]> for Host<'host> {
     type Error = InvalidHost;
 
@@ -640,11 +655,11 @@ impl<'host> TryFrom<&'host str> for Host<'host> {
 /// Even though this library supports parsing the password from the user information, it should be
 /// noted that the format "username:password" is deprecated. Also, be careful logging this!
 ///
-/// Note that the password is case-sensitive. However, percent-encoding plays no role in equality
-/// checking meaning that `"password"` and `"p%61ssword"` refer to the same password. Both of these
+/// The password is case-sensitive. However, percent-encoding plays no role in equality checking
+/// meaning that `"password"` and `"p%61ssword"` refer to the same password. Both of these
 /// attributes are reflected in the equality and hash functions.
 ///
-/// Be aware that just because percent-encoding plays no role in equality checking does not
+/// sBe aware that just because percent-encoding plays no role in equality checking does not
 /// mean that the password is normalized. The original password string will always be preserved as
 /// is with no normalization performed. You should perform percent-encoding normalization if you
 /// want to use the password for any sort of authentication (not recommended).
@@ -676,8 +691,8 @@ impl<'password> Password<'password> {
     /// lifetime problems due to the way the struct is designed. Calling this function will ensure
     /// that the returned value has a static lifetime.
     ///
-    /// Note that this is different from just cloning. Cloning the password will just copy the
-    /// references, and thus the lifetime will remain the same.
+    /// This is different from just cloning. Cloning the password will just copy the references, and
+    /// thus the lifetime will remain the same.
     pub fn into_owned(self) -> Password<'static> {
         Password(Cow::from(self.0.into_owned()))
     }
@@ -800,9 +815,9 @@ impl<'password> TryFrom<&'password str> for Password<'password> {
 
 /// A host that is a registered name (i.e. not an IP literal).
 ///
-/// Note that the host is case-insensitive meaning that `"example.com"` and `"ExAmPlE.CoM"` refer to
-/// the same host. Furthermore, percent-encoding plays no role in equality checking meaning that
-/// `"example.com"` and `"exampl%65.com"` also refer to the same host. Both of these attributes are
+/// The host is case-insensitive meaning that `"example.com"` and `"ExAmPlE.CoM"` refer to the same
+/// host. Furthermore, percent-encoding plays no role in equality checking meaning that
+///`"example.com"` and `"exampl%65.com"` also refer to the same host. Both of these attributes are
 /// reflected in the equality and hash functions.
 ///
 /// However, be aware that just because percent-encoding plays no role in equality checking does not
@@ -932,8 +947,8 @@ impl<'name> TryFrom<&'name str> for RegisteredName<'name> {
 /// The username component of the authority as defined in
 /// [[RFC3986, Section 3.2.1](https://tools.ietf.org/html/rfc3986#section-3.2.1)].
 ///
-/// Note that the username is case-sensitive. However, percent-encoding plays no role in equality
-/// checking meaning that `"username"` and `"usern%61me"` refer to the same username. Both of these
+/// The username is case-sensitive. However, percent-encoding plays no role in equality checking
+/// meaning that `"username"` and `"usern%61me"` refer to the same username. Both of these
 /// attributes are reflected in the equality and hash functions.
 ///
 /// Be aware that just because percent-encoding plays no role in equality checking does not
@@ -1077,7 +1092,7 @@ pub enum InvalidAuthority {
     /// consumed during the parsing. For example, parsing the string `"example.com/"` would generate
     /// this error since `"/"` would still be left over.
     ///
-    /// Note that this only applies to the [`Authority::try_from`] functions.
+    /// This only applies to the [`Authority::try_from`] functions.
     ExpectedEOF,
 
     /// The host component of the authority was invalid.
@@ -1141,7 +1156,7 @@ pub enum InvalidHost {
 
     /// An invalid character for an IPv4 address or registered name was used. Due to the ambiguity
     /// of the grammar, it is not possible to say which. It is also possible that all the characters
-    /// were valid, but there was an invalid percent encoding (e.g. `"%zz"`).
+    /// were valid, but there was an invalid percent encoding (e.g. `"%ZZ"`).
     InvalidIPv4OrRegisteredNameCharacter,
 
     /// The syntax for an IPv6 literal was used (i.e. `"[...]"`) and all of the characters were
@@ -1207,8 +1222,8 @@ impl Error for InvalidPort {
 /// An error representing an invalid registered name.
 ///
 /// This implies that the registered name contained an invalid host character or had an invalid
-/// percent encoding. Note that this error is not possible from parsing an authority. It can only be
-/// returned from directly parsing a registered name.
+/// percent encoding. This error is not possible from parsing an authority. It can only be returned
+/// from directly parsing a registered name.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct InvalidRegisteredName;
 
@@ -1230,7 +1245,7 @@ pub enum InvalidUserInfo {
     /// The user information contained an invalid character.
     InvalidCharacter,
 
-    /// The user information contained an invalid percent encoding (e.g. `"%zz"`).
+    /// The user information contained an invalid percent encoding (e.g. `"%ZZ"`).
     InvalidPercentEncoding,
 }
 
@@ -1422,6 +1437,9 @@ fn parse_user_info<'user_info>(
             _ => (),
         }
     }
+
+    // Unsafe: All uses of unsafe below have already been checked by [`check_user_info`] prior to
+    // calling this function.
 
     Ok(match first_colon_index {
         Some(index) => {

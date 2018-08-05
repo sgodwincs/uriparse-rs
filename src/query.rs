@@ -1,3 +1,11 @@
+//! Query Component
+//!
+//! See [[RFC3986, Section 3.4](https://tools.ietf.org/html/rfc3986#section-3.4)].
+//!
+//! This crate does not do query string parsing, it will simply make sure that it is a valid query
+//! string as defined by the RFC. You will need to use another crate (e.g.
+//! [queryst](https://github.com/rustless/queryst)) if you want it parsed.
+
 use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::error::Error;
@@ -8,6 +16,7 @@ use std::str;
 
 use utility::{percent_encoded_equality, percent_encoded_hash};
 
+/// A map of byte characters that determines if a character is a valid query character.
 #[cfg_attr(rustfmt, rustfmt_skip)]
 const QUERY_CHAR_MAP: [u8; 256] = [
  // 0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F
@@ -29,14 +38,46 @@ const QUERY_CHAR_MAP: [u8; 256] = [
     0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0, // F
 ];
 
+/// The query component as defined in
+/// [[RFC3986, Section 3.4](https://tools.ietf.org/html/rfc3986#section-3.4)].
+///
+/// The query is case-sensitive. Furthermore, percent-encoding plays no role in equality checking
+/// meaning that `"query"` and `"que%72y"` are the same query. Both of these attributes are
+/// reflected in the equality and hash functions.
+///
+/// However, be aware that just because percent-encoding plays no role in equality checking does not
+/// mean that the query is normalized. The original query string will always be preserved as is with
+/// no normalization performed.
 #[derive(Clone, Debug)]
 pub struct Query<'query>(Cow<'query, str>);
 
 impl<'query> Query<'query> {
+    /// Returns a `str` representation of the query.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Query;
+    ///
+    /// let query = Query::try_from("query").unwrap();
+    /// assert_eq!(query.as_str(), "query");
+    /// ```
     pub fn as_str(&self) -> &str {
         &self.0
     }
 
+    /// Converts the [`Query`] into an owned copy.
+    ///
+    /// If you construct the query from a source with a non-static lifetime, you may run into
+    /// lifetime problems due to the way the struct is designed. Calling this function will ensure
+    /// that the returned value has a static lifetime.
+    ///
+    /// This is different from just cloning. Cloning the query will just copy the references, and
+    /// thus the lifetime will remain the same.
     pub fn into_owned(self) -> Query<'static> {
         Query(Cow::from(self.0.into_owned()))
     }
@@ -69,6 +110,12 @@ impl<'query> Display for Query<'query> {
 }
 
 impl<'query> Eq for Query<'query> {}
+
+impl<'query> From<Query<'query>> for String {
+    fn from(value: Query<'query>) -> String {
+        value.to_string()
+    }
+}
 
 impl<'query> Hash for Query<'query> {
     fn hash<H>(&self, state: &mut H)
@@ -155,10 +202,20 @@ impl<'query> TryFrom<&'query str> for Query<'query> {
     }
 }
 
+/// An error representing an invalid query.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum InvalidQuery {
+    /// This error occurs when the string from which the query is parsed is not entirely consumed
+    /// during the parsing. For example, parsing the string `"my=query#fragment"` would generate
+    /// this error since `"#fragment"` would still be left over.
+    ///
+    /// This only applies to the [`Query::try_from`] functions.
     ExpectedEOF,
+
+    /// The fragment contained an invalid character.
     InvalidCharacter,
+
+    /// The fragment contained an invalid percent encoding (e.g. `"%ZZ"`).
     InvalidPercentEncoding,
 }
 
@@ -180,6 +237,7 @@ impl Error for InvalidQuery {
     }
 }
 
+/// Parses the query from the given byte string.
 pub(crate) fn parse_query<'query>(
     value: &'query [u8],
 ) -> Result<(Query<'query>, &'query [u8]), InvalidQuery> {
@@ -201,6 +259,8 @@ pub(crate) fn parse_query<'query>(
             _ => end_index += 1,
         }
     }
+
+    // Unsafe: The loop above makes sure this is safe.
 
     let (value, rest) = value.split_at(end_index);
     let query = Query(Cow::from(unsafe { str::from_utf8_unchecked(value) }));

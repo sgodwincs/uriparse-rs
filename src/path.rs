@@ -38,9 +38,9 @@ const PATH_CHAR_MAP: [u8; 256] = [
 /// [[RFC3986, Section 3.3](https://tools.ietf.org/html/rfc3986#section-3.3)].
 ///
 /// A path is composed of a sequence of segments. It is also either absolute or relative, where an
-/// absolute path starts with a `'/'`. Note that a URI with an authority *always* has an absolute
-/// path regardless of whether or not the path was empty (i.e. "http://example.com" has a single
-/// empty path segment and is absolute).
+/// absolute path starts with a `'/'`. A URI with an authority *always* has an absolute path
+/// regardless of whether or not the path was empty (i.e. "http://example.com" has a single empty
+/// path segment and is absolute).
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Path<'path> {
     /// Whether or not the path is absolute. Specifically, a path is absolute if it starts with a
@@ -79,8 +79,8 @@ impl<'path> Path<'path> {
     /// lifetime problems due to the way the struct is designed. Calling this function will ensure
     /// that the returned value has a static lifetime.
     ///
-    /// Note that this is different from just cloning. Cloning the path will just copy the
-    /// references, and thus the lifetime will remain the same.
+    /// This is different from just cloning. Cloning the path will just copy the references, and
+    /// thus the lifetime will remain the same.
     pub fn into_owned(self) -> Path<'static> {
         let segments = self
             .segments
@@ -96,7 +96,7 @@ impl<'path> Path<'path> {
 
     /// Returns whether or not the path is absolute (i.e. it starts with a `'/'`).
     ///
-    /// Note that any path following an [`Authority`] will *always* be parsed to be absolute.
+    /// Any path following an [`Authority`] will *always* be parsed to be absolute.
     ///
     /// # Examples
     ///
@@ -402,8 +402,8 @@ impl<'segment> Segment<'segment> {
     /// lifetime problems due to the way the struct is designed. Calling this function will ensure
     /// that the returned value has a static lifetime.
     ///
-    /// Note that this is different from just cloning. Cloning the segment will just copy the
-    /// references, and thus the lifetime will remain the same.
+    /// This is different from just cloning. Cloning the segment will just copy the references, and
+    /// thus the lifetime will remain the same.
     pub fn into_owned(self) -> Segment<'static> {
         Segment(Cow::from(self.0.into_owned()))
     }
@@ -547,13 +547,13 @@ pub enum InvalidPath {
     /// during the parsing. For example, parsing the string `"/my/path?query"` would generate
     /// this error since `"?query"` would still be left over.
     ///
-    /// Note that this only applies to the [`Path::try_from`] functions.
+    /// This only applies to the [`Path::try_from`] functions.
     ExpectedEOF,
 
     /// The path contained an invalid character.
     InvalidCharacter,
 
-    /// The path contained an invalid percent encoding (e.g. `"%zz"`).
+    /// The path contained an invalid percent encoding (e.g. `"%ZZ"`).
     InvalidPercentEncoding,
 }
 
@@ -580,6 +580,8 @@ pub(crate) fn parse_path<'path>(
     value: &'path [u8],
 ) -> Result<(Path<'path>, &'path [u8]), InvalidPath> {
     fn new_segment<'segment>(segment: &'segment [u8]) -> Segment<'segment> {
+        // Unsafe: The loop below makes sure this is safe.
+
         Segment(Cow::from(unsafe { str::from_utf8_unchecked(segment) }))
     }
 

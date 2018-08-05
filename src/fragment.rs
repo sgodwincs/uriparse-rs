@@ -72,8 +72,8 @@ impl<'fragment> Fragment<'fragment> {
     /// lifetime problems due to the way the struct is designed. Calling this function will ensure
     /// that the returned value has a static lifetime.
     ///
-    /// Note that this is different from just cloning. Cloning the fragment will just copy the
-    /// references, and thus the lifetime will remain the same.
+    /// This is different from just cloning. Cloning the fragment will just copy the references, and
+    /// thus the lifetime will remain the same.
     pub fn into_owned(self) -> Fragment<'static> {
         Fragment(Cow::from(self.0.into_owned()))
     }
@@ -197,6 +197,8 @@ impl<'fragment> TryFrom<&'fragment [u8]> for Fragment<'fragment> {
             }
         }
 
+        // Unsafe: The loop above makes sure this is safe.
+
         let fragment = Fragment(Cow::from(unsafe { str::from_utf8_unchecked(value) }));
         Ok(fragment)
     }
@@ -216,7 +218,7 @@ pub enum InvalidFragment {
     /// The fragment contained an invalid character.
     InvalidCharacter,
 
-    /// The fragment contained an invalid percent encoding (e.g. `"%zz"`).
+    /// The fragment contained an invalid percent encoding (e.g. `"%ZZ"`).
     InvalidPercentEncoding,
 }
 
