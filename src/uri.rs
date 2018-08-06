@@ -1,3 +1,7 @@
+//! URIs and URI References
+//!
+//! See [RFC3986](https://tools.ietf.org/html/rfc3986).
+
 use std::convert::TryFrom;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter, Write};
@@ -8,8 +12,11 @@ use path::{parse_path, InvalidPath, Path};
 use query::{parse_query, InvalidQuery, Query};
 use scheme::{parse_scheme, InvalidScheme, Scheme};
 
+/// A Uniform Resource Identifier (URI) as defined in
+/// [RFC3986](https://tools.ietf.org/html/rfc3986).
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct URI<'uri> {
+    /// All URIs are also URI references, so we just maintain a [`URIReference`] underneath.
     uri_reference: URIReference<'uri>,
 }
 
@@ -20,14 +27,71 @@ impl From<!> for InvalidURI {
 }
 
 impl<'uri> URI<'uri> {
+    /// Returns the authority, if present, of the URI.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URI;
+    ///
+    /// let uri = URI::try_from("http://example.com:80/my/path").unwrap();
+    /// assert_eq!(uri.authority().unwrap().to_string(), "example.com:80");
+    /// ```
     pub fn authority(&self) -> Option<&Authority<'uri>> {
         self.uri_reference.authority()
     }
 
+    /// Returns whether or not the URI can act as a base URI.
+    ///
+    /// A URI can be a base if it is absolute (i.e. it has no fragment component).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URI;
+    ///
+    /// let uri = URI::try_from("http://example.com/my/path").unwrap();
+    /// assert!(uri.can_be_a_base());
+    ///
+    /// let uri = URI::try_from("ftp://127.0.0.1#fragment").unwrap();
+    /// assert!(!uri.can_be_a_base());
+    /// ```
     pub fn can_be_a_base(&self) -> bool {
         !self.uri_reference.has_fragment()
     }
 
+    /// Constructs a new [`URI`] from the individual parts: scheme, authority, path, query, and
+    /// fragment.
+    ///
+    /// The lifetime used by the resulting value will be the lifetime of the part that is most
+    /// restricted in scope.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Fragment, URI};
+    ///
+    /// let uri = URI::from_parts(
+    ///     "http",
+    ///     Some("example.com"),
+    ///     "",
+    ///     Some("query"),
+    ///     None::<Fragment>
+    /// ).unwrap();
+    /// assert_eq!(uri.to_string(), "http://example.com/?query");
+    /// ```
     pub fn from_parts<
         'new_uri,
         SchemeType,
@@ -65,34 +129,163 @@ impl<'uri> URI<'uri> {
         Ok(URI { uri_reference })
     }
 
+    /// Returns the fragment, if present, of the URI.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URI;
+    ///
+    /// let uri = URI::try_from("http://example.com#fragment").unwrap();
+    /// assert_eq!(uri.fragment().unwrap(), "fragment");
+    /// ```
     pub fn fragment(&self) -> Option<&Fragment<'uri>> {
         self.uri_reference.fragment()
     }
 
+    /// Returns whether or not the URI has an authority component.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URI;
+    ///
+    /// let uri = URI::try_from("http://example.com").unwrap();
+    /// assert!(uri.has_authority());
+    ///
+    /// let uri = URI::try_from("urn:test").unwrap();
+    /// assert!(!uri.has_authority());
+    /// ```
     pub fn has_authority(&self) -> bool {
         self.uri_reference.has_authority()
     }
 
+    /// Returns whether or not the URI has a fragment component.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URI;
+    ///
+    /// let uri = URI::try_from("http://example.com#test").unwrap();
+    /// assert!(uri.has_fragment());
+    ///
+    /// let uri = URI::try_from("http://example.com").unwrap();
+    /// assert!(!uri.has_fragment());
+    /// ```
     pub fn has_fragment(&self) -> bool {
         self.uri_reference.has_fragment()
     }
 
+    /// Returns whether or not the URI has a password component.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URI;
+    ///
+    /// let uri = URI::try_from("http://user:pass@127.0.0.1").unwrap();
+    /// assert!(uri.has_password());
+    ///
+    /// let uri = URI::try_from("http://user@127.0.0.1").unwrap();
+    /// assert!(!uri.has_password());
+    /// ```
     pub fn has_password(&self) -> bool {
         self.uri_reference.has_password()
     }
 
+    /// Returns whether or not the URI has a query component.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URI;
+    ///
+    /// let uri = URI::try_from("http://example.com/my/path?my=query").unwrap();
+    /// assert!(uri.has_query());
+    ///
+    /// let uri = URI::try_from("http://example.com/my/path").unwrap();
+    /// assert!(!uri.has_query());
+    /// ```
     pub fn has_query(&self) -> bool {
         self.uri_reference.has_query()
     }
 
+    /// Returns whether or not the URI has a username component.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URI;
+    ///
+    /// let uri = URI::try_from("http://username@example.com").unwrap();
+    /// assert!(uri.has_username());
+    ///
+    /// let uri = URI::try_from("http://example.com").unwrap();
+    /// assert!(!uri.has_username());
+    /// ```
     pub fn has_username(&self) -> bool {
         self.uri_reference.has_username()
     }
 
+    /// Returns the host, if present, of the URI.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URI;
+    ///
+    /// let uri = URI::try_from("http://username@example.com").unwrap();
+    /// assert_eq!(uri.host().unwrap().to_string(), "example.com");
+    /// ```
     pub fn host(&self) -> Option<&Host<'uri>> {
         self.uri_reference.host()
     }
 
+    /// Converts the URI into a base URI (i.e. the fragment component is removed).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URI;
+    ///
+    /// let uri = URI::try_from("http://example.com#fragment").unwrap();
+    /// assert_eq!(uri.to_string(), "http://example.com/#fragment");
+    /// let uri = uri.into_base_uri();
+    /// assert_eq!(uri.to_string(), "http://example.com/");
+    /// ```
     pub fn into_base_uri(self) -> URI<'uri> {
         let (scheme, authority, path, query, _) = self.uri_reference.into_parts();
         let uri_reference =
@@ -100,12 +293,42 @@ impl<'uri> URI<'uri> {
         URI { uri_reference }
     }
 
+    /// Converts the [`URI`] into an owned copy.
+    ///
+    /// If you construct the URI from a source with a non-static lifetime, you may run into
+    /// lifetime problems due to the way the struct is designed. Calling this function will ensure
+    /// that the returned value has a static lifetime.
+    ///
+    /// This is different from just cloning. Cloning the URI will just copy the references, and thus
+    /// the lifetime will remain the same.
     pub fn into_owned(self) -> URI<'static> {
         URI {
             uri_reference: self.uri_reference.into_owned(),
         }
     }
 
+    /// Consumes the [`URI`] and returns its parts: scheme, authority, path, query, and fragment.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URI;
+    ///
+    /// let uri = URI::try_from(
+    ///     "http://username:password@example.com:80/my/path?my=query#fragment",
+    /// ).unwrap();
+    /// let (scheme, authority, path, query, fragment) = uri.into_parts();
+    ///
+    /// assert_eq!(scheme, "http");
+    /// assert_eq!(authority.unwrap().to_string(), "username:password@example.com:80");
+    /// assert_eq!(path, "/my/path");
+    /// assert_eq!(query.unwrap(), "my=query");
+    /// assert_eq!(fragment.unwrap(), "fragment");
+    /// ```
     pub fn into_parts(
         self,
     ) -> (
@@ -119,26 +342,112 @@ impl<'uri> URI<'uri> {
         (scheme.unwrap(), authority, path, query, fragment)
     }
 
+    /// Returns the path of the URI.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URI;
+    ///
+    /// let uri = URI::try_from("http://127.0.0.1/my/path").unwrap();
+    /// assert_eq!(uri.path(), "/my/path");
+    /// ```
     pub fn path(&self) -> &Path<'uri> {
         self.uri_reference.path()
     }
 
+    /// Returns the password, if present, of the URI.
+    ///
+    /// Usage of a password in URIs is deprecated.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URI;
+    ///
+    /// let uri = URI::try_from("http://user:pass@example.com").unwrap();
+    /// assert_eq!(uri.password().unwrap(), "pass");
+    /// ```
     pub fn password(&self) -> Option<&Password<'uri>> {
         self.uri_reference.password()
     }
 
+    /// Returns the port, if present, of the URI.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URI;
+    ///
+    /// let uri = URI::try_from("http://example.com:8080/").unwrap();
+    /// assert_eq!(uri.port().unwrap(), 8080);
+    /// ```
     pub fn port(&self) -> Option<u16> {
         self.uri_reference.port()
     }
 
+    /// Returns the query, if present, of the URI.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URI;
+    ///
+    /// let uri = URI::try_from("http://127.0.0.1?my=query").unwrap();
+    /// assert_eq!(uri.query().unwrap(), "my=query");
+    /// ```
     pub fn query(&self) -> Option<&Query<'uri>> {
         self.uri_reference.query()
     }
 
+    /// Returns the scheme of the URI.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URI;
+    ///
+    /// let uri = URI::try_from("http://127.0.0.1/").unwrap();
+    /// assert_eq!(uri.scheme(), "http");
+    /// ```
     pub fn scheme(&self) -> &Scheme<'uri> {
         self.uri_reference.scheme().unwrap()
     }
 
+    /// Returns the username, if present, of the URI.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URI;
+    ///
+    /// let uri = URI::try_from("http://username@example.com").unwrap();
+    /// assert_eq!(uri.username().unwrap(), "username");
+    /// ```
     pub fn username(&self) -> Option<&Username> {
         self.uri_reference.username()
     }
@@ -147,6 +456,12 @@ impl<'uri> URI<'uri> {
 impl<'uri> Display for URI<'uri> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         self.uri_reference.fmt(formatter)
+    }
+}
+
+impl<'uri> From<URI<'uri>> for String {
+    fn from(value: URI<'uri>) -> String {
+        value.to_string()
     }
 }
 
@@ -197,26 +512,113 @@ impl<'uri> TryFrom<&'uri str> for URI<'uri> {
     }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct URIReference<'uri> {
-    authority: Option<Authority<'uri>>,
-    fragment: Option<Fragment<'uri>>,
-    path: Path<'uri>,
-    query: Option<Query<'uri>>,
-    scheme: Option<Scheme<'uri>>,
-}
+impl<'uri> TryFrom<URIReference<'uri>> for URI<'uri> {
+    type Error = InvalidURI;
 
-impl From<!> for InvalidURIReference {
-    fn from(value: !) -> Self {
-        value
+    fn try_from(value: URIReference<'uri>) -> Result<Self, Self::Error> {
+        if value.is_uri() {
+            Ok(URI {
+                uri_reference: value,
+            })
+        } else {
+            Err(InvalidURI::CannotBeRelativeReference)
+        }
     }
 }
 
+/// A URI reference as defined in
+/// [[RFC3986, Section 4.1]](https://tools.ietf.org/html/rfc3986#section-4.1).
+///
+/// Specifically, a URI reference is either a URI or a relative reference (a schemeless URI).
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct URIReference<'uri> {
+    /// The authority component of the URI reference as defined in
+    /// [[RFC3986, Section 3.2]](https://tools.ietf.org/html/rfc3986#section-3.2).
+    authority: Option<Authority<'uri>>,
+
+    /// The fragment component of the URI reference as defined in
+    /// [[RFC3986, Section 3.5]](https://tools.ietf.org/html/rfc3986#section-3.5).
+    fragment: Option<Fragment<'uri>>,
+
+    /// The path component of the URI reference as defined in
+    /// [[RFC3986, Section 3.3]](https://tools.ietf.org/html/rfc3986#section-3.3).
+    path: Path<'uri>,
+
+    /// The query component of the URI reference as defined in
+    /// [[RFC3986, Section 3.4]](https://tools.ietf.org/html/rfc3986#section-3.4).
+    query: Option<Query<'uri>>,
+
+    /// The scheme component of the URI reference as defined in
+    /// [[RFC3986, Section 3.1](https://tools.ietf.org/html/rfc3986#section-3.1).
+    scheme: Option<Scheme<'uri>>,
+}
+
 impl<'uri> URIReference<'uri> {
+    /// Returns the authority, if present, of the URI reference.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let reference = URIReference::try_from("//example.com/my/path").unwrap();
+    /// assert_eq!(reference.authority().unwrap().to_string(), "example.com");
+    /// ```
     pub fn authority(&self) -> Option<&Authority<'uri>> {
         self.authority.as_ref()
     }
 
+    /// Returns whether or not the URI reference can act as a base URI.
+    ///
+    /// A URI can be a base if it is absolute (i.e. it has no fragment component).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let reference = URIReference::try_from("http://example.com/my/path").unwrap();
+    /// assert!(reference.can_be_a_base());
+    ///
+    /// let reference = URIReference::try_from("ftp://127.0.0.1#fragment").unwrap();
+    /// assert!(!reference.can_be_a_base());
+    /// ```
+    pub fn can_be_a_base(&self) -> bool {
+        self.has_scheme() && !self.has_fragment()
+    }
+
+    /// Constructs a new [`URIReference`] from the individual parts: scheme, authority, path, query,
+    /// and fragment.
+    ///
+    /// The lifetime used by the resulting value will be the lifetime of the part that is most
+    /// restricted in scope.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Scheme, URIReference};
+    ///
+    /// let reference = URIReference::from_parts(
+    ///     None::<Scheme>,
+    ///     Some("example.com"),
+    ///     "/my/path",
+    ///     Some("query"),
+    ///     Some("fragment")
+    /// ).unwrap();
+    /// assert_eq!(reference.to_string(), "//example.com/my/path?query#fragment");
+    /// ```
     pub fn from_parts<
         'new_uri,
         SchemeType,
@@ -258,7 +660,7 @@ impl<'uri> URIReference<'uri> {
             None => None,
         };
 
-        let path = Path::try_from(path)?;
+        let mut path = Path::try_from(path)?;
 
         if scheme.is_some()
             && authority.is_none()
@@ -277,6 +679,10 @@ impl<'uri> URIReference<'uri> {
                 .any(|byte| byte == b':')
         {
             return Err(InvalidURIReference::SchemelessPathCannotStartWithColonSegment);
+        }
+
+        if authority.is_some() {
+            path.set_absolute(true);
         }
 
         let query = match query {
@@ -298,18 +704,83 @@ impl<'uri> URIReference<'uri> {
         })
     }
 
+    /// Returns the fragment, if present, of the URI reference.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let reference = URIReference::try_from("http://example.com#fragment").unwrap();
+    /// assert_eq!(reference.fragment().unwrap(), "fragment");
+    /// ```
     pub fn fragment(&self) -> Option<&Fragment<'uri>> {
         self.fragment.as_ref()
     }
 
+    /// Returns whether or not the URI reference has an authority component.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let reference = URIReference::try_from("http://example.com").unwrap();
+    /// assert!(reference.has_authority());
+    ///
+    /// let reference = URIReference::try_from("").unwrap();
+    /// assert!(!reference.has_authority());
+    /// ```
     pub fn has_authority(&self) -> bool {
         self.authority.is_some()
     }
 
+    /// Returns whether or not the URI reference has a fragment component.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let reference = URIReference::try_from("#test").unwrap();
+    /// assert!(reference.has_fragment());
+    ///
+    /// let reference = URIReference::try_from("http://example.com").unwrap();
+    /// assert!(!reference.has_fragment());
+    /// ```
     pub fn has_fragment(&self) -> bool {
         self.fragment.is_some()
     }
 
+    /// Returns whether or not the URI reference has a password component.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let reference = URIReference::try_from("http://user:pass@127.0.0.1").unwrap();
+    /// assert!(reference.has_password());
+    ///
+    /// let reference = URIReference::try_from("http://user@127.0.0.1").unwrap();
+    /// assert!(!reference.has_password());
+    /// ```
     pub fn has_password(&self) -> bool {
         if let Some(ref authority) = self.authority {
             authority.has_password()
@@ -318,10 +789,65 @@ impl<'uri> URIReference<'uri> {
         }
     }
 
+    /// Returns whether or not the URI reference has a query component.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let reference = URIReference::try_from("/?my=query").unwrap();
+    /// assert!(reference.has_query());
+    ///
+    /// let reference = URIReference::try_from("http://example.com/my/path").unwrap();
+    /// assert!(!reference.has_query());
+    /// ```
     pub fn has_query(&self) -> bool {
         self.query.is_some()
     }
 
+    /// Returns whether or not the URI reference has a scheme component.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let reference = URIReference::try_from("http://example.com?my=query").unwrap();
+    /// assert!(reference.has_scheme());
+    ///
+    /// let reference = URIReference::try_from("/my/path").unwrap();
+    /// assert!(!reference.has_scheme());
+    /// ```
+    pub fn has_scheme(&self) -> bool {
+        self.scheme.is_some()
+    }
+
+    /// Returns whether or not the URI reference has a username component.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let reference = URIReference::try_from("//username@example.com").unwrap();
+    /// assert!(reference.has_username());
+    ///
+    /// let reference = URIReference::try_from("http://example.com").unwrap();
+    /// assert!(!reference.has_username());
+    /// ```
     pub fn has_username(&self) -> bool {
         if let Some(ref authority) = self.authority {
             authority.has_username()
@@ -330,6 +856,20 @@ impl<'uri> URIReference<'uri> {
         }
     }
 
+    /// Returns the host, if present, of the URI reference.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let reference = URIReference::try_from("http://username@example.com").unwrap();
+    /// assert_eq!(reference.host().unwrap().to_string(), "example.com");
+    /// ```
     pub fn host(&self) -> Option<&Host<'uri>> {
         if let Some(ref authority) = self.authority {
             Some(authority.host())
@@ -338,6 +878,14 @@ impl<'uri> URIReference<'uri> {
         }
     }
 
+    /// Converts the [`URIReference`] into an owned copy.
+    ///
+    /// If you construct the URI reference from a source with a non-static lifetime, you may run
+    /// into lifetime problems due to the way the struct is designed. Calling this function will
+    /// ensure that the returned value has a static lifetime.
+    ///
+    /// This is different from just cloning. Cloning the URI reference will just copy the
+    /// references, and thus the lifetime will remain the same.
     pub fn into_owned(self) -> URIReference<'static> {
         let scheme = self.scheme.map(|scheme| scheme.into_owned());
         let authority = self.authority.map(|authority| authority.into_owned());
@@ -354,6 +902,29 @@ impl<'uri> URIReference<'uri> {
         }
     }
 
+    /// Consumes the [`URIReference`] and returns its parts: scheme, authority, path, query, and
+    /// fragment.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let reference = URIReference::try_from(
+    ///     "http://username:password@example.com:80/my/path?my=query#fragment",
+    /// ).unwrap();
+    /// let (scheme, authority, path, query, fragment) = reference.into_parts();
+    ///
+    /// assert_eq!(scheme.unwrap(), "http");
+    /// assert_eq!(authority.unwrap().to_string(), "username:password@example.com:80");
+    /// assert_eq!(path, "/my/path");
+    /// assert_eq!(query.unwrap(), "my=query");
+    /// assert_eq!(fragment.unwrap(), "fragment");
+    /// ```
     pub fn into_parts(
         self,
     ) -> (
@@ -372,30 +943,143 @@ impl<'uri> URIReference<'uri> {
         )
     }
 
+    /// Returns whether or not the URI reference is an absolute path reference.
+    ///
+    /// A URI reference is an absolute path reference if it is a relative reference that begins with
+    /// a single `'/'`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let reference = URIReference::try_from("/my/path").unwrap();
+    /// assert!(reference.is_absolute_path_reference());
+    /// ```
     pub fn is_absolute_path_reference(&self) -> bool {
         self.scheme.is_none() && self.authority.is_none() && self.path.is_absolute()
     }
 
+    /// Returns whether or not the URI reference is a network path reference.
+    ///
+    /// A URI reference is a network path reference if it is a relative reference that begins with
+    /// a two `'/'`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let reference = URIReference::try_from("//example.com").unwrap();
+    /// assert!(reference.is_network_path_reference());
+    /// ```
     pub fn is_network_path_reference(&self) -> bool {
         self.scheme.is_none() && self.authority.is_some()
     }
 
+    /// Returns whether or not the URI reference is a relative path reference.
+    ///
+    /// A URI reference is a relative path reference if it is a relative reference that does not
+    /// begin with a `'/'`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let reference = URIReference::try_from("my/path").unwrap();
+    /// assert!(reference.is_relative_path_reference());
+    /// ```
     pub fn is_relative_path_reference(&self) -> bool {
         self.scheme.is_none() && self.authority.is_none() && !self.path.is_absolute()
     }
 
+    /// Returns whether or not the URI reference is a relative reference.
+    ///
+    /// A URI reference is a relative reference if it has no scheme.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let reference = URIReference::try_from("/my/path").unwrap();
+    /// assert!(reference.is_relative_reference());
+    /// ```
     pub fn is_relative_reference(&self) -> bool {
         self.scheme.is_none()
     }
 
+    /// Returns whether or not the URI reference is a URI.
+    ///
+    /// A URI reference is a URI if it has a scheme.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let reference = URIReference::try_from("http://example.com").unwrap();
+    /// assert!(reference.is_uri());
+    /// ```
     pub fn is_uri(&self) -> bool {
         self.scheme.is_some()
     }
 
+    /// Returns the path of the URI reference.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let reference = URIReference::try_from("http://127.0.0.1/my/path").unwrap();
+    /// assert_eq!(reference.path(), "/my/path");
+    /// ```
     pub fn path(&self) -> &Path<'uri> {
         &self.path
     }
 
+    /// Returns the password, if present, of the URI reference.
+    ///
+    /// Usage of a password in URI and URI references is deprecated.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let reference = URIReference::try_from("http://user:pass@example.com").unwrap();
+    /// assert_eq!(reference.password().unwrap(), "pass");
+    /// ```
     pub fn password(&self) -> Option<&Password<'uri>> {
         if let Some(ref authority) = self.authority {
             authority.password()
@@ -404,6 +1088,20 @@ impl<'uri> URIReference<'uri> {
         }
     }
 
+    /// Returns the port, if present, of the URI reference.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let reference = URIReference::try_from("http://example.com:8080/").unwrap();
+    /// assert_eq!(reference.port().unwrap(), 8080);
+    /// ```
     pub fn port(&self) -> Option<u16> {
         if let Some(ref authority) = self.authority {
             authority.port()
@@ -412,14 +1110,56 @@ impl<'uri> URIReference<'uri> {
         }
     }
 
+    /// Returns the query, if present, of the URI reference.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let reference = URIReference::try_from("http://127.0.0.1?my=query").unwrap();
+    /// assert_eq!(reference.query().unwrap(), "my=query");
+    /// ```
     pub fn query(&self) -> Option<&Query<'uri>> {
         self.query.as_ref()
     }
 
+    /// Returns the scheme, if present, of the URI reference.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let reference = URIReference::try_from("http://127.0.0.1/").unwrap();
+    /// assert_eq!(reference.scheme().unwrap(), "http");
+    /// ```
     pub fn scheme(&self) -> Option<&Scheme<'uri>> {
         self.scheme.as_ref()
     }
 
+    /// Returns the username, if present, of the URI reference.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let reference = URIReference::try_from("http://username@example.com").unwrap();
+    /// assert_eq!(reference.username().unwrap(), "username");
+    /// ```
     pub fn username(&self) -> Option<&Username> {
         if let Some(ref authority) = self.authority {
             authority.username()
@@ -647,6 +1387,12 @@ impl Error for InvalidURIReference {
     }
 }
 
+impl From<!> for InvalidURIReference {
+    fn from(value: !) -> Self {
+        value
+    }
+}
+
 impl From<InvalidAuthority> for InvalidURIReference {
     fn from(value: InvalidAuthority) -> Self {
         InvalidURIReference::InvalidAuthority(value)
@@ -698,6 +1444,26 @@ mod test {
             Some(Scheme::HTTP),
             Some("example.com"),
             "/",
+            None::<Query>,
+            None::<Fragment>,
+        ).unwrap();
+        assert_eq!(actual, expected);
+
+        let actual = URIReference::try_from("http://example.com").unwrap();
+        let expected = URIReference::from_parts(
+            Some(Scheme::HTTP),
+            Some("example.com"),
+            "",
+            None::<Query>,
+            None::<Fragment>,
+        ).unwrap();
+        assert_eq!(actual, expected);
+
+        let actual = URIReference::try_from("http://example.com/").unwrap();
+        let expected = URIReference::from_parts(
+            Some(Scheme::HTTP),
+            Some("example.com"),
+            "",
             None::<Query>,
             None::<Fragment>,
         ).unwrap();

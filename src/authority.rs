@@ -24,8 +24,14 @@
 //! # Equality
 //!
 //! While many components in this library support string comparison, [`Authority`] does not. This
-//! comes down to the [`Host`] component being ambiguous on equality (e.g. comparing IPv4 and IPv6
-//! addresses).
+//! comes down to it just being too expensive to do a proper host comparison. To do so would require
+//! conversion to [`IpAddr`], which in the case of [`Ipv6Addr`] can be expensive.
+//!
+//! Some testing reveals that doing incremental parsing and equality of the host string for IP
+//! addresses allow for considerably faster checks. For example, a custom IPv4 parser I wrote
+//! performed ~2.5 faster than what the `std` uses. Part of this is that I have to find the end of
+//! the host before I can use the `std` parser. I may in the future allow [`Authority`] comparison
+//! with custom written IPv4/IPv6 address parsers.
 
 use std::borrow::Cow;
 use std::convert::TryFrom;
