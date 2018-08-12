@@ -2191,6 +2191,18 @@ impl<'uri> Display for URIReference<'uri> {
     }
 }
 
+impl<'uri> From<RelativeReference<'uri>> for URIReference<'uri> {
+    fn from(value: RelativeReference<'uri>) -> URIReference<'uri> {
+        value.uri_reference
+    }
+}
+
+impl<'uri> From<URI<'uri>> for URIReference<'uri> {
+    fn from(value: URI<'uri>) -> URIReference<'uri> {
+        value.uri_reference
+    }
+}
+
 impl<'uri> From<URIReference<'uri>> for String {
     fn from(value: URIReference<'uri>) -> String {
         value.to_string()
