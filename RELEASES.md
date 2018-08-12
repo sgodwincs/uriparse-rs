@@ -1,3 +1,8 @@
+# 0.2.1
+
+ - Added more conversions between types.
+ - Fixed lifetime issue with username.
+
 # 0.2.0
 
  - Performance fixes.
