@@ -2191,6 +2191,12 @@ impl<'uri> Display for URIReference<'uri> {
     }
 }
 
+impl<'uri> From<URIReference<'uri>> for String {
+    fn from(value: URIReference<'uri>) -> String {
+        value.to_string()
+    }
+}
+
 impl<'uri> TryFrom<&'uri [u8]> for URIReference<'uri> {
     type Error = InvalidURIReference;
 
