@@ -2562,6 +2562,42 @@ impl Error for InvalidRelativeReference {
     }
 }
 
+impl From<!> for InvalidRelativeReference {
+    fn from(value: !) -> Self {
+        value
+    }
+}
+
+impl From<InvalidAuthority> for InvalidRelativeReference {
+    fn from(value: InvalidAuthority) -> Self {
+        InvalidRelativeReference::InvalidAuthority(value)
+    }
+}
+
+impl From<InvalidFragment> for InvalidRelativeReference {
+    fn from(value: InvalidFragment) -> Self {
+        InvalidRelativeReference::InvalidFragment(value)
+    }
+}
+
+impl From<InvalidPath> for InvalidRelativeReference {
+    fn from(value: InvalidPath) -> Self {
+        InvalidRelativeReference::InvalidPath(value)
+    }
+}
+
+impl From<InvalidQuery> for InvalidRelativeReference {
+    fn from(value: InvalidQuery) -> Self {
+        InvalidRelativeReference::InvalidQuery(value)
+    }
+}
+
+impl From<InvalidScheme> for InvalidRelativeReference {
+    fn from(value: InvalidScheme) -> Self {
+        InvalidRelativeReference::InvalidScheme(value)
+    }
+}
+
 impl TryFrom<InvalidURIReference> for InvalidRelativeReference {
     type Error = ();
 
@@ -2658,6 +2694,36 @@ impl Error for InvalidURI {
 impl From<!> for InvalidURI {
     fn from(value: !) -> Self {
         value
+    }
+}
+
+impl From<InvalidAuthority> for InvalidURI {
+    fn from(value: InvalidAuthority) -> Self {
+        InvalidURI::InvalidAuthority(value)
+    }
+}
+
+impl From<InvalidFragment> for InvalidURI {
+    fn from(value: InvalidFragment) -> Self {
+        InvalidURI::InvalidFragment(value)
+    }
+}
+
+impl From<InvalidPath> for InvalidURI {
+    fn from(value: InvalidPath) -> Self {
+        InvalidURI::InvalidPath(value)
+    }
+}
+
+impl From<InvalidQuery> for InvalidURI {
+    fn from(value: InvalidQuery) -> Self {
+        InvalidURI::InvalidQuery(value)
+    }
+}
+
+impl From<InvalidScheme> for InvalidURI {
+    fn from(value: InvalidScheme) -> Self {
+        InvalidURI::InvalidScheme(value)
     }
 }
 
