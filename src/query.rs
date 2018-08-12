@@ -112,7 +112,7 @@ impl<'query> Display for Query<'query> {
 impl<'query> Eq for Query<'query> {}
 
 impl<'query> From<Query<'query>> for String {
-    fn from(value: Query<'query>) -> String {
+    fn from(value: Query<'query>) -> Self {
         value.to_string()
     }
 }

@@ -251,7 +251,7 @@ impl<'path> Display for Path<'path> {
 }
 
 impl<'path> From<Path<'path>> for String {
-    fn from(value: Path<'path>) -> String {
+    fn from(value: Path<'path>) -> Self {
         value.to_string()
     }
 }
@@ -438,7 +438,7 @@ impl<'segment> Display for Segment<'segment> {
 impl<'segment> Eq for Segment<'segment> {}
 
 impl<'segment> From<Segment<'segment>> for String {
-    fn from(value: Segment<'segment>) -> String {
+    fn from(value: Segment<'segment>) -> Self {
         value.to_string()
     }
 }

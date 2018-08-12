@@ -509,7 +509,7 @@ impl<'uri> Display for RelativeReference<'uri> {
 }
 
 impl<'uri> From<RelativeReference<'uri>> for String {
-    fn from(value: RelativeReference<'uri>) -> String {
+    fn from(value: RelativeReference<'uri>) -> Self {
         value.to_string()
     }
 }
@@ -1222,7 +1222,7 @@ impl<'uri> Display for URI<'uri> {
 }
 
 impl<'uri> From<URI<'uri>> for String {
-    fn from(value: URI<'uri>) -> String {
+    fn from(value: URI<'uri>) -> Self {
         value.to_string()
     }
 }
@@ -2192,19 +2192,19 @@ impl<'uri> Display for URIReference<'uri> {
 }
 
 impl<'uri> From<RelativeReference<'uri>> for URIReference<'uri> {
-    fn from(value: RelativeReference<'uri>) -> URIReference<'uri> {
+    fn from(value: RelativeReference<'uri>) -> Self {
         value.uri_reference
     }
 }
 
 impl<'uri> From<URI<'uri>> for URIReference<'uri> {
-    fn from(value: URI<'uri>) -> URIReference<'uri> {
+    fn from(value: URI<'uri>) -> Self {
         value.uri_reference
     }
 }
 
 impl<'uri> From<URIReference<'uri>> for String {
-    fn from(value: URIReference<'uri>) -> String {
+    fn from(value: URIReference<'uri>) -> Self {
         value.to_string()
     }
 }

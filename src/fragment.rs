@@ -108,7 +108,7 @@ impl<'fragment> Display for Fragment<'fragment> {
 impl<'fragment> Eq for Fragment<'fragment> {}
 
 impl<'fragment> From<Fragment<'fragment>> for String {
-    fn from(value: Fragment<'fragment>) -> String {
+    fn from(value: Fragment<'fragment>) -> Self {
         value.to_string()
     }
 }

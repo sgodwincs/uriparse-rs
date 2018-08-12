@@ -223,7 +223,7 @@ impl<'scheme> Display for Scheme<'scheme> {
 }
 
 impl<'scheme> From<Scheme<'scheme>> for String {
-    fn from(value: Scheme<'scheme>) -> String {
+    fn from(value: Scheme<'scheme>) -> Self {
         value.to_string()
     }
 }
@@ -336,7 +336,7 @@ impl<'scheme> Display for UnregisteredScheme<'scheme> {
 impl<'scheme> Eq for UnregisteredScheme<'scheme> {}
 
 impl<'scheme> From<UnregisteredScheme<'scheme>> for String {
-    fn from(value: UnregisteredScheme<'scheme>) -> String {
+    fn from(value: UnregisteredScheme<'scheme>) -> Self {
         value.to_string()
     }
 }
