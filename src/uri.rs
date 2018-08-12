@@ -497,7 +497,7 @@ impl<'uri> RelativeReference<'uri> {
     /// let reference = RelativeReference::try_from("//username@example.com").unwrap();
     /// assert_eq!(reference.username().unwrap(), "username");
     /// ```
-    pub fn username(&self) -> Option<&Username> {
+    pub fn username(&self) -> Option<&Username<'uri>> {
         self.uri_reference.username()
     }
 }
@@ -1210,7 +1210,7 @@ impl<'uri> URI<'uri> {
     /// let uri = URI::try_from("http://username@example.com").unwrap();
     /// assert_eq!(uri.username().unwrap(), "username");
     /// ```
-    pub fn username(&self) -> Option<&Username> {
+    pub fn username(&self) -> Option<&Username<'uri>> {
         self.uri_reference.username()
     }
 }
@@ -2154,7 +2154,7 @@ impl<'uri> URIReference<'uri> {
     /// let reference = URIReference::try_from("http://username@example.com").unwrap();
     /// assert_eq!(reference.username().unwrap(), "username");
     /// ```
-    pub fn username(&self) -> Option<&Username> {
+    pub fn username(&self) -> Option<&Username<'uri>> {
         if let Some(ref authority) = self.authority {
             authority.username()
         } else {
