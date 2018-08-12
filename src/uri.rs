@@ -2592,12 +2592,6 @@ impl From<InvalidQuery> for InvalidRelativeReference {
     }
 }
 
-impl From<InvalidScheme> for InvalidRelativeReference {
-    fn from(value: InvalidScheme) -> Self {
-        InvalidRelativeReference::InvalidScheme(value)
-    }
-}
-
 impl TryFrom<InvalidURIReference> for InvalidRelativeReference {
     type Error = ();
 
