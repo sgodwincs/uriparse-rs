@@ -22,4 +22,7 @@ pub use fragment::{Fragment, InvalidFragment};
 pub use path::{InvalidPath, Path, Segment};
 pub use query::{InvalidQuery, Query};
 pub use scheme::{InvalidScheme, Scheme, SchemeStatus, UnregisteredScheme};
-pub use uri::{InvalidURI, InvalidURIReference, RelativeReference, URIReference, URI};
+pub use uri::{
+    InvalidURI, InvalidURIReference, RelativeReference, RelativeReferenceBuilder, URIBuilder,
+    URIReference, URIReferenceBuilder, URI,
+};

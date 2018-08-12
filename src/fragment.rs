@@ -238,3 +238,9 @@ impl Error for InvalidFragment {
         }
     }
 }
+
+impl From<!> for InvalidFragment {
+    fn from(value: !) -> Self {
+        value
+    }
+}

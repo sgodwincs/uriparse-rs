@@ -237,6 +237,12 @@ impl Error for InvalidQuery {
     }
 }
 
+impl From<!> for InvalidQuery {
+    fn from(value: !) -> Self {
+        value
+    }
+}
+
 /// Parses the query from the given byte string.
 pub(crate) fn parse_query<'query>(
     value: &'query [u8],

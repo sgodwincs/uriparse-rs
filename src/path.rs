@@ -575,6 +575,12 @@ impl Error for InvalidPath {
     }
 }
 
+impl From<!> for InvalidPath {
+    fn from(value: !) -> Self {
+        value
+    }
+}
+
 /// Parses the path from the given byte string.
 pub(crate) fn parse_path<'path>(
     value: &'path [u8],

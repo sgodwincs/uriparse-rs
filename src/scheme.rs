@@ -168,12 +168,20 @@ macro_rules! schemes {
             }
 
             let mut end_index = 1;
+            let mut lowercase_scheme = [0; MAX_REGISTERED_SCHEME_LENGTH];
+            lowercase_scheme[0] = value[0].to_ascii_lowercase();
 
             while let Some(&byte) = bytes.next() {
                 match SCHEME_CHAR_MAP[byte as usize] {
                     0 if byte == b':' => break,
                     0 => return Err(InvalidScheme::InvalidCharacter),
-                    _ => end_index += 1
+                    _ => {
+                        if end_index + 1 < MAX_REGISTERED_SCHEME_LENGTH {
+                            lowercase_scheme[end_index] = byte.to_ascii_lowercase();
+                        }
+
+                        end_index += 1;
+                    }
                 }
             }
 
@@ -184,12 +192,6 @@ macro_rules! schemes {
 
             if end_index > MAX_REGISTERED_SCHEME_LENGTH {
                 return Ok((unregistered_scheme(value), rest));
-            }
-
-            let mut lowercase_scheme = [0; MAX_REGISTERED_SCHEME_LENGTH];
-
-            for (index, byte) in value.iter().enumerate() {
-                lowercase_scheme[index] = byte.to_ascii_lowercase();
             }
 
             let scheme = SCHEME_NAME_MAP
@@ -433,6 +435,12 @@ impl Error for InvalidScheme {
             InvalidCharacter => "invalid scheme character",
             MustStartWithAlphabetic => "scheme must start with alphabetic character",
         }
+    }
+}
+
+impl From<!> for InvalidScheme {
+    fn from(value: !) -> Self {
+        value
     }
 }
 

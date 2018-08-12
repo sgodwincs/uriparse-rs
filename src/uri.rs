@@ -1,6 +1,22 @@
-//! URIs and URI References
+//! URIs, Relative References, and URI References
 //!
 //! See [RFC3986](https://tools.ietf.org/html/rfc3986).
+//!
+//! This module is composed of three primary types [`URI`], [`RelativeReference`], and
+//! [`URIReference`] that are all very similar. The first thing to note is that URIs and relative
+//! references are types of URI references. They differ in only one way: URIs have schemes, while
+//! relative references do not.
+//!
+//! As a result, choose the type that best fits your use case. If you need absolute URIs, you should
+//! use [`URI`], but if you want relative references (e.g. `"/"` in a GET request) use
+//! [`RelativeReference`]. If you can accept both, then use [`URIReference`].
+//!
+//! Each type also has a corresponding builder type to allow for convenient construction and
+//! modification via the [`RelativeReference::into_builder`], [`URI::into_builder`] and
+//! [`URIReference::into_builder`] functions.
+//!
+//! All three types are immutable, so if you want to change a component such as the path, you need
+//! to reconstruct the type via either the builder or by converting it into its parts and back.
 
 use std::convert::TryFrom;
 use std::error::Error;
@@ -16,7 +32,10 @@ use scheme::{parse_scheme, InvalidScheme, Scheme};
 /// [[RFC3986, Section 4.1]](https://tools.ietf.org/html/rfc3986#section-4.1).
 ///
 /// Specifically, a relative reference is a URI reference without a scheme.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct RelativeReference<'uri> {
+    /// All relative references are also URI references, so we just maintain a [`URIReference`]
+    /// underneath.
     uri_reference: URIReference<'uri>,
 }
 
@@ -37,6 +56,25 @@ impl<'uri> RelativeReference<'uri> {
     /// ```
     pub fn authority(&self) -> Option<&Authority<'uri>> {
         self.uri_reference.authority()
+    }
+
+    /// Constructs a default builder for a relative reference.
+    ///
+    /// This provides an alternative means of constructing a relative reference besides parsing and
+    /// [`RelativeReference::from_parts`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use uriparse::RelativeReference;
+    ///
+    /// let mut builder = RelativeReference::builder();
+    /// builder.path("/my/path").fragment(Some("fragment"));
+    /// let reference = builder.build().unwrap();
+    /// assert_eq!(reference.to_string(), "/my/path#fragment");
+    /// ```
+    pub fn builder<'new_uri>() -> RelativeReferenceBuilder<'new_uri> {
+        RelativeReferenceBuilder::new()
     }
 
     /// Constructs a new [`RelativeReference`] from the individual parts: authority, path, query,
@@ -231,6 +269,33 @@ impl<'uri> RelativeReference<'uri> {
     /// ```
     pub fn host(&self) -> Option<&Host<'uri>> {
         self.uri_reference.host()
+    }
+
+    /// Consumes the relative reference and converts it into a builder with the same values.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Fragment, Query, RelativeReference};
+    ///
+    /// let reference = RelativeReference::try_from("//example.com/path?query#fragment").unwrap();
+    /// let mut builder = reference.into_builder();
+    /// builder.query(None::<Query>).fragment(None::<Fragment>);
+    /// let reference = builder.build().unwrap();
+    /// assert_eq!(reference.to_string(), "//example.com/path");
+    /// ```
+    pub fn into_builder(self) -> RelativeReferenceBuilder<'uri> {
+        let mut builder = RelativeReferenceBuilder::new();
+        builder
+            .authority(self.uri_reference.authority)
+            .path(self.uri_reference.path)
+            .query(self.uri_reference.query)
+            .fragment(self.uri_reference.fragment);
+        builder
     }
 
     /// Converts the [`RelativeReference`] into an owned copy.
@@ -449,30 +514,6 @@ impl<'uri> From<RelativeReference<'uri>> for String {
     }
 }
 
-impl<'uri> PartialEq<str> for RelativeReference<'uri> {
-    fn eq(&self, other: &str) -> bool {
-        self.uri_reference == other
-    }
-}
-
-impl<'uri> PartialEq<RelativeReference<'uri>> for str {
-    fn eq(&self, other: &RelativeReference<'uri>) -> bool {
-        self == other.uri_reference
-    }
-}
-
-impl<'a, 'uri> PartialEq<&'a str> for RelativeReference<'uri> {
-    fn eq(&self, other: &&'a str) -> bool {
-        self.uri_reference == *other
-    }
-}
-
-impl<'a, 'uri> PartialEq<RelativeReference<'uri>> for &'a str {
-    fn eq(&self, other: &RelativeReference<'uri>) -> bool {
-        *self == other.uri_reference
-    }
-}
-
 impl<'uri> TryFrom<&'uri [u8]> for RelativeReference<'uri> {
     type Error = InvalidRelativeReference;
 
@@ -510,6 +551,186 @@ impl<'uri> TryFrom<URIReference<'uri>> for RelativeReference<'uri> {
     }
 }
 
+/// A builder type for [`RelativeReference]`.
+///
+/// You must use the [`RelativeReferenceBuilder::path`] function before building as relative
+/// references always have a path. Everything else is optional.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct RelativeReferenceBuilder<'uri> {
+    /// All relative references are also URI references, so we just maintain a
+    /// [`URIReferenceBuilder`] underneath.
+    uri_reference_builder: URIReferenceBuilder<'uri>,
+}
+
+impl<'uri> RelativeReferenceBuilder<'uri> {
+    /// Sets the authority part of the relative reference.
+    ///
+    /// If the given authority is not a valid authority (i.e. the conversion fails), an error is
+    /// stored internally and checked during the [`RelativeReferenceBuilder::build`] function. The
+    /// error state will be rewritten for any following calls to this function.
+    ///
+    /// It is optional to specify an authority.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use uriparse::RelativeReferenceBuilder;
+    ///
+    /// let mut builder = RelativeReferenceBuilder::new();
+    /// builder.authority(Some("example.com")).path("/my/path");
+    /// let reference = builder.build().unwrap();
+    /// assert_eq!(reference.to_string(), "//example.com/my/path");
+    /// ```
+    pub fn authority<AuthorityType, AuthorityError>(
+        &mut self,
+        authority: Option<AuthorityType>,
+    ) -> &mut Self
+    where
+        Authority<'uri>: TryFrom<AuthorityType, Error = AuthorityError>,
+        InvalidAuthority: From<AuthorityError>,
+    {
+        self.uri_reference_builder.authority(authority);
+        self
+    }
+
+    /// Consumes the builder and tries to build a [`RelativeReference`].
+    ///
+    /// This function will error in one of three situations:
+    ///  - One of the components specified in the builder is invalid.
+    ///  - A path was not specified in the builder.
+    ///  - While all individual components were valid, their combination as a relative reference was
+    ///    invalid.
+    ///
+    /// # Examples
+    ///
+    /// First error type (invalid path):
+    ///
+    /// ```
+    /// use uriparse::RelativeReferenceBuilder;
+    ///
+    /// let mut builder = RelativeReferenceBuilder::new();
+    /// builder.path("this is an invalid path %%%");
+    /// assert!(builder.build().is_err());
+    /// ```
+    ///
+    /// Second error type (path not specified):
+    ///
+    /// ```
+    /// use uriparse::RelativeReferenceBuilder;
+    ///
+    /// let builder = RelativeReferenceBuilder::new();
+    /// assert!(builder.build().is_err());
+    /// ```
+    ///
+    /// Third error type (first segment in schemeless path cannot contain a `':'`):
+    ///
+    /// ```
+    /// use uriparse::RelativeReferenceBuilder;
+    ///
+    /// let mut builder = RelativeReferenceBuilder::new();
+    /// builder.path("my:/path");
+    /// assert!(builder.build().is_err());
+    /// ```
+    pub fn build(self) -> Result<RelativeReference<'uri>, InvalidRelativeReference> {
+        Ok(RelativeReference {
+            uri_reference: self
+                .uri_reference_builder
+                .build()
+                .map_err(|error| InvalidRelativeReference::try_from(error).unwrap())?,
+        })
+    }
+
+    /// Sets the fragment part of the relative reference.
+    ///
+    /// If the given fragment is not a valid fragment (i.e. the conversion fails), an error is
+    /// stored internally and checked during the [`RelativeReferenceBuilder::build`] function. The
+    /// error state will be rewritten for any following calls to this function.
+    ///
+    /// It is optional to specify a fragment.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use uriparse::RelativeReferenceBuilder;
+    ///
+    /// let mut builder = RelativeReferenceBuilder::new();
+    /// builder.path("/my/path").fragment(Some("fragment"));
+    /// let reference = builder.build().unwrap();
+    /// assert_eq!(reference.to_string(), "/my/path#fragment");
+    /// ```
+    pub fn fragment<FragmentType, FragmentError>(
+        &mut self,
+        fragment: Option<FragmentType>,
+    ) -> &mut Self
+    where
+        Fragment<'uri>: TryFrom<FragmentType, Error = FragmentError>,
+        InvalidFragment: From<FragmentError>,
+    {
+        self.uri_reference_builder.fragment(fragment);
+        self
+    }
+
+    /// Constructs a new builder with nothing set.
+    pub fn new() -> Self {
+        RelativeReferenceBuilder::default()
+    }
+
+    /// Sets the path part of the relative reference.
+    ///
+    /// If the given path is not a valid path (i.e. the conversion fails), an error is stored
+    /// internally and checked during the [`RelativeReferenceBuilder::build`] function. The error
+    /// state will be rewritten for any following calls to this function.
+    ///
+    /// It is required to specify an path. Not doing so will result in an error during the
+    /// [`RelativeReferenceBuilder::build`] function.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use uriparse::RelativeReferenceBuilder;
+    ///
+    /// let mut builder = RelativeReferenceBuilder::new();
+    /// builder.path("/my/path");
+    /// let reference = builder.build().unwrap();
+    /// assert_eq!(reference.to_string(), "/my/path");
+    /// ```
+    pub fn path<PathType, PathError>(&mut self, path: PathType) -> &mut Self
+    where
+        Path<'uri>: TryFrom<PathType, Error = PathError>,
+        InvalidPath: From<PathError>,
+    {
+        self.uri_reference_builder.path(path);
+        self
+    }
+
+    /// Sets the query part of the relative reference.
+    ///
+    /// If the given query is not a valid query (i.e. the conversion fails), an error is stored
+    /// internally and checked during the [`RelativeReferenceBuilder::build`] function. The error
+    /// state will be rewritten for any following calls to this function.
+    ///
+    /// It is optional to specify a query.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use uriparse::RelativeReferenceBuilder;
+    ///
+    /// let mut builder = RelativeReferenceBuilder::new();
+    /// builder.path("/my/path").query(Some("query"));
+    /// let reference = builder.build().unwrap();
+    /// assert_eq!(reference.to_string(), "/my/path?query");
+    /// ```
+    pub fn query<QueryType, QueryError>(&mut self, query: Option<QueryType>) -> &mut Self
+    where
+        Query<'uri>: TryFrom<QueryType, Error = QueryError>,
+        InvalidQuery: From<QueryError>,
+    {
+        self.uri_reference_builder.query(query);
+        self
+    }
+}
+
 /// A Uniform Resource Identifier (URI) as defined in
 /// [RFC3986](https://tools.ietf.org/html/rfc3986).
 ///
@@ -518,12 +739,6 @@ impl<'uri> TryFrom<URIReference<'uri>> for RelativeReference<'uri> {
 pub struct URI<'uri> {
     /// All URIs are also URI references, so we just maintain a [`URIReference`] underneath.
     uri_reference: URIReference<'uri>,
-}
-
-impl From<!> for InvalidURI {
-    fn from(value: !) -> Self {
-        value
-    }
 }
 
 impl<'uri> URI<'uri> {
@@ -543,6 +758,25 @@ impl<'uri> URI<'uri> {
     /// ```
     pub fn authority(&self) -> Option<&Authority<'uri>> {
         self.uri_reference.authority()
+    }
+
+    /// Constructs a default builder for a URI.
+    ///
+    /// This provides an alternative means of constructing a URI besides parsing and
+    /// [`URI::from_parts`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use uriparse::URI;
+    ///
+    /// let mut builder = URI::builder();
+    /// builder.scheme("http").authority(Some("example.com")).path("/my/path");
+    /// let uri = builder.build().unwrap();
+    /// assert_eq!(uri.to_string(), "http://example.com/my/path");
+    /// ```
+    pub fn builder<'new_uri>() -> URIBuilder<'new_uri> {
+        URIBuilder::new()
     }
 
     /// Returns whether or not the URI can act as a base URI.
@@ -793,6 +1027,34 @@ impl<'uri> URI<'uri> {
         URI { uri_reference }
     }
 
+    /// Consumes the URI and converts it into a builder with the same values.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Fragment, Query, URI};
+    ///
+    /// let uri = URI::try_from("http://example.com/path?query#fragment").unwrap();
+    /// let mut builder = uri.into_builder();
+    /// builder.query(None::<Query>).fragment(None::<Fragment>);
+    /// let uri = builder.build().unwrap();
+    /// assert_eq!(uri.to_string(), "http://example.com/path");
+    /// ```
+    pub fn into_builder(self) -> URIBuilder<'uri> {
+        let mut builder = URIBuilder::new();
+        builder
+            .scheme(self.uri_reference.scheme.unwrap())
+            .authority(self.uri_reference.authority)
+            .path(self.uri_reference.path)
+            .query(self.uri_reference.query)
+            .fragment(self.uri_reference.fragment);
+        builder
+    }
+
     /// Converts the [`URI`] into an owned copy.
     ///
     /// If you construct the URI from a source with a non-static lifetime, you may run into
@@ -965,30 +1227,6 @@ impl<'uri> From<URI<'uri>> for String {
     }
 }
 
-impl<'uri> PartialEq<str> for URI<'uri> {
-    fn eq(&self, other: &str) -> bool {
-        self.uri_reference == other
-    }
-}
-
-impl<'uri> PartialEq<URI<'uri>> for str {
-    fn eq(&self, other: &URI<'uri>) -> bool {
-        self == other.uri_reference
-    }
-}
-
-impl<'a, 'uri> PartialEq<&'a str> for URI<'uri> {
-    fn eq(&self, other: &&'a str) -> bool {
-        self.uri_reference == *other
-    }
-}
-
-impl<'a, 'uri> PartialEq<URI<'uri>> for &'a str {
-    fn eq(&self, other: &URI<'uri>) -> bool {
-        *self == other.uri_reference
-    }
-}
-
 impl<'uri> TryFrom<&'uri [u8]> for URI<'uri> {
     type Error = InvalidURI;
 
@@ -1023,6 +1261,215 @@ impl<'uri> TryFrom<URIReference<'uri>> for URI<'uri> {
         } else {
             Err(InvalidURI::CannotBeRelativeReference)
         }
+    }
+}
+
+/// A builder type for [`URI]`.
+///
+/// You must use the [`URI::scheme`] and [`URI::path`] functions before building as URIs always
+/// have a scheme and path. Everything else is optional.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct URIBuilder<'uri> {
+    /// All URIs are also URI references, so we just maintain a [`URIReferenceBuilder`] underneath.
+    uri_reference_builder: URIReferenceBuilder<'uri>,
+}
+
+impl<'uri> URIBuilder<'uri> {
+    /// Sets the authority part of the URI.
+    ///
+    /// If the given authority is not a valid authority (i.e. the conversion fails), an error is
+    /// stored internally and checked during the [`URIBuilder::build`] function. The error state
+    /// will be rewritten for any following calls to this function.
+    ///
+    /// It is optional to specify an authority.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use uriparse::URIBuilder;
+    ///
+    /// let mut builder = URIBuilder::new();
+    /// builder.scheme("http").authority(Some("example.com")).path("/my/path");
+    /// let uri = builder.build().unwrap();
+    /// assert_eq!(uri.to_string(), "http://example.com/my/path");
+    /// ```
+    pub fn authority<AuthorityType, AuthorityError>(
+        &mut self,
+        authority: Option<AuthorityType>,
+    ) -> &mut Self
+    where
+        Authority<'uri>: TryFrom<AuthorityType, Error = AuthorityError>,
+        InvalidAuthority: From<AuthorityError>,
+    {
+        self.uri_reference_builder.authority(authority);
+        self
+    }
+
+    /// Consumes the builder and tries to build a [`URI`].
+    ///
+    /// This function will error in one of three situations:
+    ///  - One of the components specified in the builder is invalid.
+    ///  - A scheme and path were not specified in the builder.
+    ///  - While all individual components were valid, their combination as a URI was invalid.
+    ///
+    /// # Examples
+    ///
+    /// First error type (invalid path):
+    ///
+    /// ```
+    /// use uriparse::URIBuilder;
+    ///
+    /// let mut builder = URIBuilder::new();
+    /// builder.scheme("urn").path("this is an invalid path %%%");
+    /// assert!(builder.build().is_err());
+    /// ```
+    ///
+    /// Second error type (scheme and/or path were not specified):
+    ///
+    /// ```
+    /// use uriparse::URIBuilder;
+    ///
+    /// let mut builder = URIBuilder::new();
+    /// builder.path("/my/path");
+    /// assert!(builder.build().is_err());
+    /// ```
+    ///
+    /// Third error type (URI with no authority cannot have path starting with `"//"`):
+    ///
+    /// ```
+    /// use uriparse::URIBuilder;
+    ///
+    /// let mut builder = URIBuilder::new();
+    /// builder.scheme("urn").path("//path");
+    /// assert!(builder.build().is_err());
+    /// ```
+    pub fn build(self) -> Result<URI<'uri>, InvalidURI> {
+        let uri_reference = self
+            .uri_reference_builder
+            .build()
+            .map_err(|error| InvalidURI::try_from(error).unwrap())?;
+
+        if !uri_reference.has_scheme() {
+            return Err(InvalidURI::MissingScheme);
+        }
+
+        Ok(URI { uri_reference })
+    }
+
+    /// Sets the fragment part of the URI.
+    ///
+    /// If the given fragment is not a valid fragment (i.e. the conversion fails), an error is
+    /// stored internally and checked during the [`URIBuilder::build`] function. The error state
+    /// will be rewritten for any following calls to this function.
+    ///
+    /// It is optional to specify a fragment.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use uriparse::URIBuilder;
+    ///
+    /// let mut builder = URIBuilder::new();
+    /// builder.scheme("urn").path("path").fragment(Some("fragment"));
+    /// let uri = builder.build().unwrap();
+    /// assert_eq!(uri.to_string(), "urn:path#fragment");
+    /// ```
+    pub fn fragment<FragmentType, FragmentError>(
+        &mut self,
+        fragment: Option<FragmentType>,
+    ) -> &mut Self
+    where
+        Fragment<'uri>: TryFrom<FragmentType, Error = FragmentError>,
+        InvalidFragment: From<FragmentError>,
+    {
+        self.uri_reference_builder.fragment(fragment);
+        self
+    }
+
+    /// Constructs a new builder with nothing set.
+    pub fn new() -> Self {
+        URIBuilder::default()
+    }
+
+    /// Sets the path part of the URI.
+    ///
+    /// If the given path is not a valid path (i.e. the conversion fails), an error is stored
+    /// internally and checked during the [`URIBuilder::build`] function. The error state will be
+    /// rewritten for any following calls to this function.
+    ///
+    /// It is required to specify a path.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use uriparse::URIBuilder;
+    ///
+    /// let mut builder = URIBuilder::new();
+    /// builder.scheme("urn").path("path");
+    /// let uri = builder.build().unwrap();
+    /// assert_eq!(uri.to_string(), "urn:path");
+    /// ```
+    pub fn path<PathType, PathError>(&mut self, path: PathType) -> &mut Self
+    where
+        Path<'uri>: TryFrom<PathType, Error = PathError>,
+        InvalidPath: From<PathError>,
+    {
+        self.uri_reference_builder.path(path);
+        self
+    }
+
+    /// Sets the query part of the URI.
+    ///
+    /// If the given query is not a valid query (i.e. the conversion fails), an error is stored
+    /// internally and checked during the [`URIBuilder::build`] function. The error state will be
+    /// rewritten for any following calls to this function.
+    ///
+    /// It is optional to specify a query.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use uriparse::URIBuilder;
+    ///
+    /// let mut builder = URIBuilder::new();
+    /// builder.scheme("urn").path("path").query(Some("query"));
+    /// let uri = builder.build().unwrap();
+    /// assert_eq!(uri.to_string(), "urn:path?query");
+    /// ```
+    pub fn query<QueryType, QueryError>(&mut self, query: Option<QueryType>) -> &mut Self
+    where
+        Query<'uri>: TryFrom<QueryType, Error = QueryError>,
+        InvalidQuery: From<QueryError>,
+    {
+        self.uri_reference_builder.query(query);
+        self
+    }
+
+    /// Sets the scheme part of the URI.
+    ///
+    /// If the given scheme is not a valid scheme (i.e. the conversion fails), an error is stored
+    /// internally and checked during the [`URIBuilder::build`] function. The error state will be
+    /// rewritten for any following calls to this function.
+    ///
+    /// It is required to specify a scheme.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use uriparse::URIBuilder;
+    ///
+    /// let mut builder = URIBuilder::new();
+    /// builder.scheme("urn").path("path");
+    /// let uri = builder.build().unwrap();
+    /// assert_eq!(uri.to_string(), "urn:path");
+    /// ```
+    pub fn scheme<SchemeType, SchemeError>(&mut self, scheme: SchemeType) -> &mut Self
+    where
+        Scheme<'uri>: TryFrom<SchemeType, Error = SchemeError>,
+        InvalidScheme: From<SchemeError>,
+    {
+        self.uri_reference_builder.scheme(Some(scheme));
+        self
     }
 }
 
@@ -1070,6 +1517,25 @@ impl<'uri> URIReference<'uri> {
     /// ```
     pub fn authority(&self) -> Option<&Authority<'uri>> {
         self.authority.as_ref()
+    }
+
+    /// Constructs a default builder for a URI reference.
+    ///
+    /// This provides an alternative means of constructing a URI reference besides parsing and
+    /// [`URIReference::from_parts`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use uriparse::URIReference;
+    ///
+    /// let mut builder = URIReference::builder();
+    /// builder.scheme(Some("http")).authority(Some("example.com")).path("/my/path");
+    /// let reference = builder.build().unwrap();
+    /// assert_eq!(reference.to_string(), "http://example.com/my/path");
+    /// ```
+    pub fn builder<'new_uri>() -> URIReferenceBuilder<'new_uri> {
+        URIReferenceBuilder::default()
     }
 
     /// Returns whether or not the URI reference can act as a base URI.
@@ -1376,6 +1842,34 @@ impl<'uri> URIReference<'uri> {
         } else {
             None
         }
+    }
+
+    /// Consumes the URI reference and converts it into a builder with the same values.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Fragment, Query, URIReference};
+    ///
+    /// let reference = URIReference::try_from("//example.com/path?query#fragment").unwrap();
+    /// let mut builder = reference.into_builder();
+    /// builder.query(None::<Query>).fragment(None::<Fragment>);
+    /// let reference = builder.build().unwrap();
+    /// assert_eq!(reference.to_string(), "//example.com/path");
+    /// ```
+    pub fn into_builder(self) -> URIReferenceBuilder<'uri> {
+        let mut builder = URIReferenceBuilder::new();
+        builder
+            .scheme(self.scheme)
+            .authority(self.authority)
+            .path(self.path)
+            .query(self.query)
+            .fragment(self.fragment);
+        builder
     }
 
     /// Converts the [`URIReference`] into an owned copy.
@@ -1697,50 +2191,6 @@ impl<'uri> Display for URIReference<'uri> {
     }
 }
 
-impl<'uri> PartialEq<str> for URIReference<'uri> {
-    fn eq(&self, other: &str) -> bool {
-        let uri_reference = match URIReference::try_from(other) {
-            Ok(uri_reference) => uri_reference,
-            Err(_) => return false,
-        };
-
-        *self == uri_reference
-    }
-}
-
-impl<'uri> PartialEq<URIReference<'uri>> for str {
-    fn eq(&self, other: &URIReference<'uri>) -> bool {
-        let uri_reference = match URIReference::try_from(self) {
-            Ok(uri_reference) => uri_reference,
-            Err(_) => return false,
-        };
-
-        uri_reference == *other
-    }
-}
-
-impl<'a, 'uri> PartialEq<&'a str> for URIReference<'uri> {
-    fn eq(&self, other: &&'a str) -> bool {
-        let uri_reference = match URIReference::try_from(*other) {
-            Ok(uri_reference) => uri_reference,
-            Err(_) => return false,
-        };
-
-        *self == uri_reference
-    }
-}
-
-impl<'a, 'uri> PartialEq<URIReference<'uri>> for &'a str {
-    fn eq(&self, other: &URIReference<'uri>) -> bool {
-        let uri_reference = match URIReference::try_from(*self) {
-            Ok(uri_reference) => uri_reference,
-            Err(_) => return false,
-        };
-
-        uri_reference == *other
-    }
-}
-
 impl<'uri> TryFrom<&'uri [u8]> for URIReference<'uri> {
     type Error = InvalidURIReference;
 
@@ -1799,13 +2249,286 @@ impl<'uri> TryFrom<&'uri str> for URIReference<'uri> {
     }
 }
 
+/// A builder type for [`URIReference]`.
+///
+/// You must use the [`URIReference::path`] function before building as URI references always have
+/// have a path. Everything else is optional.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct URIReferenceBuilder<'uri> {
+    /// The authority component of the URI reference as defined in
+    /// [[RFC3986, Section 3.2]](https://tools.ietf.org/html/rfc3986#section-3.2).
+    authority: Option<Result<Authority<'uri>, InvalidAuthority>>,
+
+    /// The fragment component of the URI reference as defined in
+    /// [[RFC3986, Section 3.5]](https://tools.ietf.org/html/rfc3986#section-3.5).
+    fragment: Option<Result<Fragment<'uri>, InvalidFragment>>,
+
+    /// The path component of the URI reference as defined in
+    /// [[RFC3986, Section 3.3]](https://tools.ietf.org/html/rfc3986#section-3.3).
+    path: Option<Result<Path<'uri>, InvalidPath>>,
+
+    /// The query component of the URI reference as defined in
+    /// [[RFC3986, Section 3.4]](https://tools.ietf.org/html/rfc3986#section-3.4).
+    query: Option<Result<Query<'uri>, InvalidQuery>>,
+
+    /// The scheme component of the URI reference as defined in
+    /// [[RFC3986, Section 3.1]](https://tools.ietf.org/html/rfc3986#section-3.1).
+    scheme: Option<Result<Scheme<'uri>, InvalidScheme>>,
+}
+
+impl<'uri> URIReferenceBuilder<'uri> {
+    /// Sets the authority part of the URI reference.
+    ///
+    /// If the given authority is not a valid authority (i.e. the conversion fails), an error is
+    /// stored internally and checked during the [`URIBuilder::build`] function. The error state
+    /// will be rewritten for any following calls to this function.
+    ///
+    /// It is optional to specify an authority.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use uriparse::URIReferenceBuilder;
+    ///
+    /// let mut builder = URIReferenceBuilder::new();
+    /// builder.authority(Some("example.com")).path("/my/path");
+    /// let reference = builder.build().unwrap();
+    /// assert_eq!(reference.to_string(), "//example.com/my/path");
+    /// ```
+    pub fn authority<AuthorityType, AuthorityError>(
+        &mut self,
+        authority: Option<AuthorityType>,
+    ) -> &mut Self
+    where
+        Authority<'uri>: TryFrom<AuthorityType, Error = AuthorityError>,
+        InvalidAuthority: From<AuthorityError>,
+    {
+        self.authority =
+            authority.map(|authority| Authority::try_from(authority).map_err(|error| error.into()));
+        self
+    }
+
+    /// Consumes the builder and tries to build a [`URIReference`].
+    ///
+    /// This function will error in one of three situations:
+    ///  - One of the components specified in the builder is invalid.
+    ///  - A path was not specified in the builder.
+    ///  - While all individual components were valid, their combination as a URI reference was
+    ///    invalid.
+    ///
+    /// # Examples
+    ///
+    /// First error type (invalid path):
+    ///
+    /// ```
+    /// use uriparse::URIReferenceBuilder;
+    ///
+    /// let mut builder = URIReferenceBuilder::new();
+    /// builder.path("this is an invalid path %%%");
+    /// assert!(builder.build().is_err());
+    /// ```
+    ///
+    /// Second error type (path not specified):
+    ///
+    /// ```
+    /// use uriparse::URIReferenceBuilder;
+    ///
+    /// let builder = URIReferenceBuilder::new();
+    /// assert!(builder.build().is_err());
+    /// ```
+    ///
+    /// Third error type (first segment in schemeless path cannot contain a `':'`):
+    ///
+    /// ```
+    /// use uriparse::URIReferenceBuilder;
+    ///
+    /// let mut builder = URIReferenceBuilder::new();
+    /// builder.path("my:/path");
+    /// assert!(builder.build().is_err());
+    /// ```
+    pub fn build(self) -> Result<URIReference<'uri>, InvalidURIReference> {
+        let scheme = match self.scheme {
+            Some(scheme) => Some(scheme?),
+            None => None,
+        };
+        let authority = match self.authority {
+            Some(authority) => Some(authority?),
+            None => None,
+        };
+        let path = match self.path {
+            Some(path) => path?,
+            None => return Err(InvalidURIReference::MissingPath),
+        };
+        let query = match self.query {
+            Some(query) => Some(query?),
+            None => None,
+        };
+        let fragment = match self.fragment {
+            Some(fragment) => Some(fragment?),
+            None => None,
+        };
+
+        URIReference::from_parts(scheme, authority, path, query, fragment)
+    }
+
+    /// Sets the fragment part of the URI reference.
+    ///
+    /// If the given fragment is not a valid fragment (i.e. the conversion fails), an error is
+    /// stored internally and checked during the [`URIReferenceBuilder::build`] function. The error
+    /// state will be rewritten for any following calls to this function.
+    ///
+    /// It is optional to specify a fragment.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use uriparse::URIReferenceBuilder;
+    ///
+    /// let mut builder = URIReferenceBuilder::new();
+    /// builder.path("/my/path").fragment(Some("fragment"));
+    /// let reference = builder.build().unwrap();
+    /// assert_eq!(reference.to_string(), "/my/path#fragment");
+    /// ```
+    pub fn fragment<FragmentType, FragmentError>(
+        &mut self,
+        fragment: Option<FragmentType>,
+    ) -> &mut Self
+    where
+        Fragment<'uri>: TryFrom<FragmentType, Error = FragmentError>,
+        InvalidFragment: From<FragmentError>,
+    {
+        self.fragment =
+            fragment.map(|fragment| Fragment::try_from(fragment).map_err(|error| error.into()));
+        self
+    }
+
+    /// Constructs a new builder with nothing set.
+    pub fn new() -> Self {
+        URIReferenceBuilder::default()
+    }
+
+    /// Sets the path part of the URI reference.
+    ///
+    /// If the given path is not a valid path (i.e. the conversion fails), an error is stored
+    /// internally and checked during the [`URIReferenceBuilder::build`] function. The error state
+    /// will be rewritten for any following calls to this function.
+    ///
+    /// It is required to specify an path. Not doing so will result in an error during the
+    /// [`URIReferenceBuilder::build`] function.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use uriparse::URIReferenceBuilder;
+    ///
+    /// let mut builder = URIReferenceBuilder::new();
+    /// builder.path("/my/path");
+    /// let reference = builder.build().unwrap();
+    /// assert_eq!(reference.to_string(), "/my/path");
+    /// ```
+    pub fn path<PathType, PathError>(&mut self, path: PathType) -> &mut Self
+    where
+        Path<'uri>: TryFrom<PathType, Error = PathError>,
+        InvalidPath: From<PathError>,
+    {
+        self.path = Some(Path::try_from(path).map_err(|error| error.into()));
+        self
+    }
+
+    /// Sets the query part of the URI reference.
+    ///
+    /// If the given query is not a valid query (i.e. the conversion fails), an error is stored
+    /// internally and checked during the [`URIReferenceBuilder::build`] function. The error state
+    /// will be rewritten for any following calls to this function.
+    ///
+    /// It is optional to specify a query.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use uriparse::URIReferenceBuilder;
+    ///
+    /// let mut builder = URIReferenceBuilder::new();
+    /// builder.path("/my/path").query(Some("query"));
+    /// let reference = builder.build().unwrap();
+    /// assert_eq!(reference.to_string(), "/my/path?query");
+    /// ```
+    pub fn query<QueryType, QueryError>(&mut self, query: Option<QueryType>) -> &mut Self
+    where
+        Query<'uri>: TryFrom<QueryType, Error = QueryError>,
+        InvalidQuery: From<QueryError>,
+    {
+        self.query = query.map(|query| Query::try_from(query).map_err(|error| error.into()));
+        self
+    }
+
+    /// Sets the scheme part of the URI reference.
+    ///
+    /// If the given scheme is not a valid scheme (i.e. the conversion fails), an error is stored
+    /// internally and checked during the [`URIReferenceBuilder::build`] function. The error state
+    /// will be rewritten for any following calls to this function.
+    ///
+    /// It is optional to specify a scheme.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use uriparse::URIReferenceBuilder;
+    ///
+    /// let mut builder = URIReferenceBuilder::new();
+    /// builder.scheme(Some("urn")).path("path");
+    /// let uri = builder.build().unwrap();
+    /// assert_eq!(uri.to_string(), "urn:path");
+    /// ```
+    pub fn scheme<SchemeType, SchemeError>(&mut self, scheme: Option<SchemeType>) -> &mut Self
+    where
+        Scheme<'uri>: TryFrom<SchemeType, Error = SchemeError>,
+        InvalidScheme: From<SchemeError>,
+    {
+        self.scheme = scheme.map(|scheme| Scheme::try_from(scheme).map_err(|error| error.into()));
+        self
+    }
+}
+
+/// An error representing an invalid relative reference.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum InvalidRelativeReference {
+    /// Represents the case where there is no authority, but the first path segment starts with
+    /// `"//"`. This is not allowed because it would be interpreted as an authority component.
+    ///
+    /// This can only occur when using creation functions that act on individual parts (e.g.
+    /// [`RelativeReference::from_parts`]).
+    AbsolutePathCannotStartWithTwoSlashes,
+
+    /// When parsing from some byte string source, if the source ends up being a URI, then it is
+    /// obviously not a relative reference.
+    ///
+    /// This can only occur when parsing from a byte string source.
     CannotBeURI,
+
+    /// The authority component of the relative reference was invalid.
     InvalidAuthority(InvalidAuthority),
+
+    /// The fragment component of the relative reference was invalid.
     InvalidFragment(InvalidFragment),
+
+    /// The path component of the relative reference was invalid.
     InvalidPath(InvalidPath),
+
+    /// The query component of the relative reference was invalid.
     InvalidQuery(InvalidQuery),
+
+    /// This error occurs when you do not specify a path component on the builder.
+    ///
+    /// This can only occur when using [`RelativeReferenceBuilder`].
+    MissingPath,
+
+    /// Represents the case where the first path segment contains a `':'`. This is not allowed
+    /// because it would be interpreted as a scheme component.
+    ///
+    /// This can only occur when using creation functions that act on individual parts (e.g.
+    /// [`RelativeReference::from_parts`]).
+    SchemelessPathCannotStartWithColonSegment,
 }
 
 impl Display for InvalidRelativeReference {
@@ -1819,11 +2542,16 @@ impl Error for InvalidRelativeReference {
         use self::InvalidRelativeReference::*;
 
         match self {
+            AbsolutePathCannotStartWithTwoSlashes => "absolute path cannot start with two slashes",
             CannotBeURI => "cannot be URI",
             InvalidAuthority(invalid_authority) => invalid_authority.description(),
             InvalidFragment(invalid_fragment) => invalid_fragment.description(),
             InvalidPath(invalid_path) => invalid_path.description(),
             InvalidQuery(invalid_query) => invalid_query.description(),
+            MissingPath => "missing path",
+            SchemelessPathCannotStartWithColonSegment => {
+                "schemeless path cannot start with colon segment"
+            }
         }
     }
 }
@@ -1835,9 +2563,10 @@ impl TryFrom<InvalidURIReference> for InvalidRelativeReference {
         use self::InvalidRelativeReference::*;
 
         match value {
-            InvalidURIReference::AbsolutePathCannotStartWithTwoSlashes
-            | InvalidURIReference::SchemelessPathCannotStartWithColonSegment
-            | InvalidURIReference::InvalidScheme(_) => Err(()),
+            InvalidURIReference::InvalidScheme(_) => Err(()),
+            InvalidURIReference::AbsolutePathCannotStartWithTwoSlashes => {
+                Ok(AbsolutePathCannotStartWithTwoSlashes)
+            }
             InvalidURIReference::InvalidAuthority(invalid_authority) => {
                 Ok(InvalidAuthority(invalid_authority))
             }
@@ -1846,18 +2575,54 @@ impl TryFrom<InvalidURIReference> for InvalidRelativeReference {
             }
             InvalidURIReference::InvalidPath(invalid_path) => Ok(InvalidPath(invalid_path)),
             InvalidURIReference::InvalidQuery(invalid_query) => Ok(InvalidQuery(invalid_query)),
+            InvalidURIReference::MissingPath => Ok(MissingPath),
+            InvalidURIReference::SchemelessPathCannotStartWithColonSegment => {
+                Ok(SchemelessPathCannotStartWithColonSegment)
+            }
         }
     }
 }
 
+/// An error representing an invalid URI.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum InvalidURI {
+    /// Represents the case when there is no authority, but the first path segment starts with
+    /// `"//"`. This is not allowed because it would be interpreted as an authority component.
+    ///
+    /// This can only occur when using creation functions that act on individual parts (e.g.
+    /// [`URI::from_parts`]).
+    AbsolutePathCannotStartWithTwoSlashes,
+
+    /// When parsing from some byte string source, if the source ends up being a relative reference,
+    /// then it is obviously not a URI.
+    ///
+    /// This can only occur when parsing from a byte string source.
     CannotBeRelativeReference,
+
+    /// The authority component of the relative reference was invalid.
     InvalidAuthority(InvalidAuthority),
+
+    /// The fragment component of the relative reference was invalid.
     InvalidFragment(InvalidFragment),
+
+    /// The path component of the relative reference was invalid.
     InvalidPath(InvalidPath),
+
+    /// The query component of the relative reference was invalid.
     InvalidQuery(InvalidQuery),
+
+    /// The scheme component of the relative reference was invalid.
     InvalidScheme(InvalidScheme),
+
+    /// This error occurs when you do not specify a path component on the builder.
+    ///
+    /// This can only occur when using [`URIBuilder`].
+    MissingPath,
+
+    /// This error occurs when you do not specify a scheme component on the builder.
+    ///
+    /// This can only occur when using [`URIBuilder`].
+    MissingScheme,
 }
 
 impl Display for InvalidURI {
@@ -1871,13 +2636,22 @@ impl Error for InvalidURI {
         use self::InvalidURI::*;
 
         match self {
+            AbsolutePathCannotStartWithTwoSlashes => "absolute path cannot start with two slashes",
             CannotBeRelativeReference => "cannot be relative reference",
             InvalidAuthority(invalid_authority) => invalid_authority.description(),
             InvalidFragment(invalid_fragment) => invalid_fragment.description(),
             InvalidPath(invalid_path) => invalid_path.description(),
             InvalidQuery(invalid_query) => invalid_query.description(),
             InvalidScheme(invalid_scheme) => invalid_scheme.description(),
+            MissingPath => "missing path",
+            MissingScheme => "missing scheme",
         }
+    }
+}
+
+impl From<!> for InvalidURI {
+    fn from(value: !) -> Self {
+        value
     }
 }
 
@@ -1888,8 +2662,10 @@ impl TryFrom<InvalidURIReference> for InvalidURI {
         use self::InvalidURI::*;
 
         match value {
-            InvalidURIReference::AbsolutePathCannotStartWithTwoSlashes
-            | InvalidURIReference::SchemelessPathCannotStartWithColonSegment => Err(()),
+            InvalidURIReference::SchemelessPathCannotStartWithColonSegment => Err(()),
+            InvalidURIReference::AbsolutePathCannotStartWithTwoSlashes => {
+                Ok(AbsolutePathCannotStartWithTwoSlashes)
+            }
             InvalidURIReference::InvalidAuthority(invalid_authority) => {
                 Ok(InvalidAuthority(invalid_authority))
             }
@@ -1899,19 +2675,47 @@ impl TryFrom<InvalidURIReference> for InvalidURI {
             InvalidURIReference::InvalidPath(invalid_path) => Ok(InvalidPath(invalid_path)),
             InvalidURIReference::InvalidQuery(invalid_query) => Ok(InvalidQuery(invalid_query)),
             InvalidURIReference::InvalidScheme(invalid_scheme) => Ok(InvalidScheme(invalid_scheme)),
+            InvalidURIReference::MissingPath => Ok(MissingPath),
         }
     }
 }
 
+/// An error representing an invalid URI reference.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum InvalidURIReference {
+    /// Represents the case when there is no authority, but the first path segment starts with
+    /// `"//"`. This is not allowed because it would be interpreted as an authority component.
+    ///
+    /// This can only occur when using creation functions that act on individual parts (e.g.
+    /// [`URIReference::from_parts`]).
     AbsolutePathCannotStartWithTwoSlashes,
-    SchemelessPathCannotStartWithColonSegment,
+
+    /// The authority component of the relative reference was invalid.
     InvalidAuthority(InvalidAuthority),
+
+    /// The fragment component of the relative reference was invalid.
     InvalidFragment(InvalidFragment),
+
+    /// The path component of the relative reference was invalid.
     InvalidPath(InvalidPath),
+
+    /// The query component of the relative reference was invalid.
     InvalidQuery(InvalidQuery),
+
+    /// The scheme component of the relative reference was invalid.
     InvalidScheme(InvalidScheme),
+
+    /// This error occurs when you do not specify a path component on the builder.
+    ///
+    /// This can only occur when using [`URIReferenceBuilder`].
+    MissingPath,
+
+    /// Represents the case when there is no authority, but the first path segment starts with
+    /// `"//"`. This is not allowed because it would be interpreted as an authority component.
+    ///
+    /// This can only occur when using creation functions that act on individual parts (e.g.
+    /// [`URIReference::from_parts`]).
+    SchemelessPathCannotStartWithColonSegment,
 }
 
 impl Display for InvalidURIReference {
@@ -1926,14 +2730,15 @@ impl Error for InvalidURIReference {
 
         match self {
             AbsolutePathCannotStartWithTwoSlashes => "absolute path cannot start with two slashes",
-            SchemelessPathCannotStartWithColonSegment => {
-                "schemeless path cannot start with colon segment"
-            }
             InvalidAuthority(invalid_authority) => invalid_authority.description(),
             InvalidFragment(invalid_fragment) => invalid_fragment.description(),
             InvalidPath(invalid_path) => invalid_path.description(),
             InvalidQuery(invalid_query) => invalid_query.description(),
             InvalidScheme(invalid_scheme) => invalid_scheme.description(),
+            MissingPath => "missing path",
+            SchemelessPathCannotStartWithColonSegment => {
+                "schemeless path cannot start with colon segment"
+            }
         }
     }
 }
