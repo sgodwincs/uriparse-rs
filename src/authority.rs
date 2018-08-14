@@ -2,9 +2,6 @@
 //!
 //! See [[RFC3986, Section 3.2](https://tools.ietf.org/html/rfc3986#section-3.2)].
 //!
-//! [`Authority`] contains no mutable methods. If you want to change a part of the authority, you
-//! must use the [`Authority::into_parts`] and [`Authority::from_parts`] functions.
-//!
 //! # Examples
 //!
 //! ```
@@ -38,6 +35,7 @@ use std::convert::TryFrom;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter, Write};
 use std::hash::{Hash, Hasher};
+use std::mem;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::ops::Deref;
 use std::str;
@@ -320,6 +318,102 @@ impl<'authority> Authority<'authority> {
         (self.username, self.password, self.host, self.port)
     }
 
+    /// Maps the host using the given map function.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Authority, Host};
+    ///
+    /// let mut reference = Authority::try_from("example.com").unwrap();
+    /// reference.map_host(|_| Host::try_from("127.0.0.1").unwrap());
+    /// assert_eq!(reference.to_string(), "127.0.0.1");
+    /// ```
+    pub fn map_host<Mapper>(&mut self, mapper: Mapper) -> &Host<'authority>
+    where
+        Mapper: FnOnce(Host<'authority>) -> Host<'authority>,
+    {
+        let temp_host = Host::RegisteredName(RegisteredName(Cow::from("")));
+        let host = mapper(mem::replace(&mut self.host, temp_host));
+        self.set_host(host)
+            .expect("mapped host resulted in invalid state")
+    }
+
+    /// Maps the password using the given map function.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Authority, Password};
+    ///
+    /// let mut reference = Authority::try_from("example.com").unwrap();
+    /// reference.map_password(|_| Some(Password::try_from("password").unwrap()));
+    /// assert_eq!(reference.to_string(), ":password@example.com");
+    /// ```
+    pub fn map_password<Mapper>(&mut self, mapper: Mapper) -> Option<&Password<'authority>>
+    where
+        Mapper: FnOnce(Option<Password<'authority>>) -> Option<Password<'authority>>,
+    {
+        let password = mapper(self.password.take());
+        self.set_password(password)
+            .expect("mapped password resulted in invalid state")
+    }
+
+    /// Maps the port using the given map function.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Authority;
+    ///
+    /// let mut reference = Authority::try_from("example.com").unwrap();
+    /// reference.map_port(|_| Some(8080));
+    /// assert_eq!(reference.to_string(), "example.com:8080");
+    /// ```
+    pub fn map_port<Mapper>(&mut self, mapper: Mapper) -> Option<u16>
+    where
+        Mapper: FnOnce(Option<u16>) -> Option<u16>,
+    {
+        let port = mapper(self.port);
+        self.set_port(port)
+    }
+
+    /// Maps the username using the given map function.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Authority, Username};
+    ///
+    /// let mut reference = Authority::try_from("example.com").unwrap();
+    /// reference.map_username(|_| Some(Username::try_from("username").unwrap()));
+    /// assert_eq!(reference.to_string(), "username@example.com");
+    /// ```
+    pub fn map_username<Mapper>(&mut self, mapper: Mapper) -> Option<&Username<'authority>>
+    where
+        Mapper: FnOnce(Option<Username<'authority>>) -> Option<Username<'authority>>,
+    {
+        let username = mapper(self.username.take());
+        self.set_username(username)
+            .expect("mapped username resulted in invalid state")
+    }
+
     /// The password component of the authority as defined in
     /// [[RFC3986, Section 3.2.1](https://tools.ietf.org/html/rfc3986#section-3.2.1)].
     ///
@@ -364,6 +458,142 @@ impl<'authority> Authority<'authority> {
         self.port
     }
 
+    /// Sets the host of the authority.
+    ///
+    /// An error will be returned if the conversion to a [`Host`] fails.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    /// use std::net::Ipv6Addr;
+    ///
+    /// use uriparse::{Authority, Host};
+    ///
+    /// let mut reference = Authority::try_from("example.com:8080").unwrap();
+    /// reference.set_host("127.0.0.1");
+    /// assert_eq!(reference.to_string(), "127.0.0.1:8080");
+    /// reference.set_host(Host::IPv6Address("::1".parse().unwrap()));
+    /// assert_eq!(reference.to_string(), "[::1]:8080");
+    /// ```
+    pub fn set_host<HostType, HostError>(
+        &mut self,
+        host: HostType,
+    ) -> Result<&Host<'authority>, InvalidAuthority>
+    where
+        Host<'authority>: TryFrom<HostType, Error = HostError>,
+        InvalidAuthority: From<HostError>,
+    {
+        self.host = Host::try_from(host)?;
+        Ok(self.host())
+    }
+
+    /// Sets the password of the authority.
+    ///
+    /// An error will be returned if the conversion to a [`Password`] fails.
+    ///
+    /// If the given password is not `None`, then the username will be set to `""` if it is
+    /// currently not set.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Authority;
+    ///
+    /// let mut reference = Authority::try_from("example.com").unwrap();
+    /// reference.set_password(Some("secret"));
+    /// assert_eq!(reference.to_string(), ":secret@example.com");
+    /// ```
+    pub fn set_password<PasswordType, PasswordError>(
+        &mut self,
+        password: Option<PasswordType>,
+    ) -> Result<Option<&Password<'authority>>, InvalidAuthority>
+    where
+        Password<'authority>: TryFrom<PasswordType, Error = PasswordError>,
+        InvalidAuthority: From<PasswordError>,
+    {
+        self.password = match password {
+            Some(password) => {
+                let password = Password::try_from(password)?;
+
+                if self.username.is_none() {
+                    self.username = Some(Username(Cow::from("")));
+                }
+
+                Some(password)
+            }
+            None => None,
+        };
+        Ok(self.password())
+    }
+
+    /// Sets the port of the authority.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Authority;
+    ///
+    /// let mut reference = Authority::try_from("example.com").unwrap();
+    /// reference.set_port(Some(8080));
+    /// assert_eq!(reference.to_string(), "example.com:8080");
+    /// ```
+    pub fn set_port(&mut self, port: Option<u16>) -> Option<u16> {
+        self.port = port;
+        self.port
+    }
+
+    /// Sets the username of the authority.
+    ///
+    /// An error will be returned if the conversion to a [`Username`] fails.
+    ///
+    /// If the given username is `None`, this will also remove any set password.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Authority, Username};
+    ///
+    /// let mut reference = Authority::try_from("example.com").unwrap();
+    /// reference.set_username(Some("myname"));
+    /// assert_eq!(reference.to_string(), "myname@example.com");
+    ///
+    /// let mut reference = Authority::try_from("user:pass@example.com").unwrap();
+    /// reference.set_username(None::<Username>);
+    /// assert_eq!(reference.to_string(), "example.com");
+    /// ```
+    pub fn set_username<UsernameType, UsernameError>(
+        &mut self,
+        username: Option<UsernameType>,
+    ) -> Result<Option<&Username<'authority>>, InvalidAuthority>
+    where
+        Username<'authority>: TryFrom<UsernameType, Error = UsernameError>,
+        InvalidAuthority: From<UsernameError>,
+    {
+        self.username = match username {
+            Some(username) => Some(Username::try_from(username)?),
+            None => {
+                self.password = None;
+                None
+            }
+        };
+        Ok(self.username())
+    }
+
     /// The username component of the authority as defined in
     /// [[RFC3986, Section 3.2.1](https://tools.ietf.org/html/rfc3986#section-3.2.1)].
     ///
@@ -390,8 +620,6 @@ impl<'authority> Authority<'authority> {
 
 impl<'authority> Display for Authority<'authority> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        use self::Host::*;
-
         if let Some(ref username) = self.username {
             username.fmt(formatter)?;
 
@@ -403,11 +631,7 @@ impl<'authority> Display for Authority<'authority> {
             formatter.write_char('@')?;
         }
 
-        match self.host {
-            IPv4Address(ref address) => address.fmt(formatter)?,
-            IPv6Address(ref address) => address.fmt(formatter)?,
-            RegisteredName(ref name) => name.fmt(formatter)?,
-        }
+        self.host.fmt(formatter)?;
 
         if let Some(port) = self.port {
             formatter.write_char(':')?;
@@ -551,7 +775,11 @@ impl<'host> Display for Host<'host> {
 
         match self {
             IPv4Address(address) => address.fmt(formatter),
-            IPv6Address(address) => address.fmt(formatter),
+            IPv6Address(address) => {
+                formatter.write_char('[')?;
+                address.fmt(formatter)?;
+                formatter.write_char(']')
+            }
             RegisteredName(name) => formatter.write_str(name.as_str()),
         }
     }
