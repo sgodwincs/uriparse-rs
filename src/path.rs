@@ -134,6 +134,10 @@ impl<'path> Path<'path> {
         !self.absolute
     }
 
+    /// Creates a path with no segments on it.
+    ///
+    /// This is only used to avoid allocations for temporary paths. Any path created using this
+    /// function is **not** valid!
     pub(crate) unsafe fn new_with_no_segments(absolute: bool) -> Path<'static> {
         Path {
             absolute: absolute,
@@ -170,6 +174,9 @@ impl<'path> Path<'path> {
     ///
     /// If the conversion to a [`Segment`] fails, an [`InvalidPath`] will be returned.
     ///
+    /// The behavior of this function is different if the current path is just one empty segment. In
+    /// this case, the pushed segment will replace that empty segment.
+    ///
     /// ```
     /// # #![feature(try_from)]
     /// #
@@ -180,6 +187,10 @@ impl<'path> Path<'path> {
     /// let mut path = Path::try_from("/my/path").unwrap();
     /// path.push("test");
     /// assert_eq!(path, "/my/path/test");
+    ///
+    /// let mut path = Path::try_from("/").unwrap();
+    /// path.push("test");
+    /// assert_eq!(path, "/test");
     /// ```
     pub fn push<SegmentType, SegmentError>(
         &mut self,
@@ -190,7 +201,13 @@ impl<'path> Path<'path> {
         InvalidPath: From<SegmentError>,
     {
         let segment = Segment::try_from(segment)?;
-        self.segments.push(segment);
+
+        if self.segments.len() == 1 && self.segments[0].as_str().is_empty() {
+            self.segments[0] = segment;
+        } else {
+            self.segments.push(segment);
+        }
+
         Ok(())
     }
 
