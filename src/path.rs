@@ -45,7 +45,7 @@ const PATH_CHAR_MAP: [u8; 256] = [
 pub struct Path<'path> {
     /// Whether or not the path is absolute. Specifically, a path is absolute if it starts with a
     /// `'/'`.
-    is_absolute: bool,
+    absolute: bool,
 
     /// The sequence of segments that compose the path.
     segments: Vec<Segment<'path>>,
@@ -89,7 +89,7 @@ impl<'path> Path<'path> {
             .collect::<Vec<Segment<'static>>>();
 
         Path {
-            is_absolute: self.is_absolute,
+            absolute: self.absolute,
             segments,
         }
     }
@@ -111,7 +111,34 @@ impl<'path> Path<'path> {
     /// assert_eq!(path.is_absolute(), true);
     /// ```
     pub fn is_absolute(&self) -> bool {
-        self.is_absolute
+        self.absolute
+    }
+
+    /// Returns whether or not the path is relative (i.e. it does not start with a `'/'`).
+    ///
+    /// Any path following an [`Authority`] will *always* be parsed to be absolute.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Path;
+    ///
+    /// let path = Path::try_from("my/path").unwrap();
+    /// assert_eq!(path.is_relative(), true);
+    /// ```
+    pub fn is_relative(&self) -> bool {
+        !self.absolute
+    }
+
+    pub(crate) unsafe fn new_with_no_segments(absolute: bool) -> Path<'static> {
+        Path {
+            absolute: absolute,
+            segments: Vec::new(),
+        }
     }
 
     /// Pops the last segment off of the path.
@@ -154,10 +181,13 @@ impl<'path> Path<'path> {
     /// path.push("test");
     /// assert_eq!(path, "/my/path/test");
     /// ```
-    pub fn push<S, E>(&mut self, segment: S) -> Result<(), InvalidPath>
+    pub fn push<SegmentType, SegmentError>(
+        &mut self,
+        segment: SegmentType,
+    ) -> Result<(), InvalidPath>
     where
-        Segment<'path>: TryFrom<S, Error = E>,
-        InvalidPath: From<E>,
+        Segment<'path>: TryFrom<SegmentType, Error = SegmentError>,
+        InvalidPath: From<SegmentError>,
     {
         let segment = Segment::try_from(segment)?;
         self.segments.push(segment);
@@ -228,13 +258,13 @@ impl<'path> Path<'path> {
     /// assert_eq!(path, "my/path");
     /// ```
     pub fn set_absolute(&mut self, absolute: bool) {
-        self.is_absolute = absolute;
+        self.absolute = absolute;
     }
 }
 
 impl<'path> Display for Path<'path> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        if self.is_absolute {
+        if self.absolute {
             formatter.write_char('/')?;
         }
 
@@ -258,7 +288,7 @@ impl<'path> From<Path<'path>> for String {
 
 impl<'path> PartialEq<[u8]> for Path<'path> {
     fn eq(&self, mut other: &[u8]) -> bool {
-        if self.is_absolute {
+        if self.absolute {
             match other.get(0) {
                 Some(&byte) => if byte != b'/' {
                     return false;
@@ -591,7 +621,7 @@ pub(crate) fn parse_path<'path>(
         Segment(Cow::from(unsafe { str::from_utf8_unchecked(segment) }))
     }
 
-    let (value, is_absolute) = if value.starts_with(b"/") {
+    let (value, absolute) = if value.starts_with(b"/") {
         (&value[1..], true)
     } else {
         (value, false)
@@ -608,10 +638,7 @@ pub(crate) fn parse_path<'path>(
         match PATH_CHAR_MAP[byte as usize] {
             0 if byte == b'?' || byte == b'#' => {
                 segments.push(new_segment(&value[segment_start_index..segment_end_index]));
-                let path = Path {
-                    is_absolute,
-                    segments,
-                };
+                let path = Path { absolute, segments };
 
                 return Ok((path, &value[segment_end_index..]));
             }
@@ -634,10 +661,7 @@ pub(crate) fn parse_path<'path>(
     }
 
     segments.push(new_segment(&value[segment_start_index..]));
-    let path = Path {
-        is_absolute,
-        segments,
-    };
+    let path = Path { absolute, segments };
 
     Ok((path, b""))
 }
