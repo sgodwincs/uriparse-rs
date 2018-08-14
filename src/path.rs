@@ -175,7 +175,8 @@ impl<'path> Path<'path> {
     /// If the conversion to a [`Segment`] fails, an [`InvalidPath`] will be returned.
     ///
     /// The behavior of this function is different if the current path is just one empty segment. In
-    /// this case, the pushed segment will replace that empty segment.
+    /// this case, the pushed segment will replace that empty segment unless the pushed segment is
+    /// itself empty.
     ///
     /// ```
     /// # #![feature(try_from)]
@@ -191,6 +192,10 @@ impl<'path> Path<'path> {
     /// let mut path = Path::try_from("/").unwrap();
     /// path.push("test");
     /// assert_eq!(path, "/test");
+    ///
+    /// let mut path = Path::try_from("/").unwrap();
+    /// path.push("");
+    /// assert_eq!(path, "//");
     /// ```
     pub fn push<SegmentType, SegmentError>(
         &mut self,
@@ -202,7 +207,7 @@ impl<'path> Path<'path> {
     {
         let segment = Segment::try_from(segment)?;
 
-        if self.segments.len() == 1 && self.segments[0].as_str().is_empty() {
+        if segment != "" && self.segments.len() == 1 && self.segments[0].as_str().is_empty() {
             self.segments[0] = segment;
         } else {
             self.segments.push(segment);
