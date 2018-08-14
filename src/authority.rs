@@ -329,9 +329,9 @@ impl<'authority> Authority<'authority> {
     ///
     /// use uriparse::{Authority, Host};
     ///
-    /// let mut reference = Authority::try_from("example.com").unwrap();
-    /// reference.map_host(|_| Host::try_from("127.0.0.1").unwrap());
-    /// assert_eq!(reference.to_string(), "127.0.0.1");
+    /// let mut authority = Authority::try_from("example.com").unwrap();
+    /// authority.map_host(|_| Host::try_from("127.0.0.1").unwrap());
+    /// assert_eq!(authority.to_string(), "127.0.0.1");
     /// ```
     pub fn map_host<Mapper>(&mut self, mapper: Mapper) -> &Host<'authority>
     where
@@ -354,9 +354,9 @@ impl<'authority> Authority<'authority> {
     ///
     /// use uriparse::{Authority, Password};
     ///
-    /// let mut reference = Authority::try_from("example.com").unwrap();
-    /// reference.map_password(|_| Some(Password::try_from("password").unwrap()));
-    /// assert_eq!(reference.to_string(), ":password@example.com");
+    /// let mut authority = Authority::try_from("example.com").unwrap();
+    /// authority.map_password(|_| Some(Password::try_from("password").unwrap()));
+    /// assert_eq!(authority.to_string(), ":password@example.com");
     /// ```
     pub fn map_password<Mapper>(&mut self, mapper: Mapper) -> Option<&Password<'authority>>
     where
@@ -378,9 +378,9 @@ impl<'authority> Authority<'authority> {
     ///
     /// use uriparse::Authority;
     ///
-    /// let mut reference = Authority::try_from("example.com").unwrap();
-    /// reference.map_port(|_| Some(8080));
-    /// assert_eq!(reference.to_string(), "example.com:8080");
+    /// let mut authority = Authority::try_from("example.com").unwrap();
+    /// authority.map_port(|_| Some(8080));
+    /// assert_eq!(authority.to_string(), "example.com:8080");
     /// ```
     pub fn map_port<Mapper>(&mut self, mapper: Mapper) -> Option<u16>
     where
@@ -401,9 +401,9 @@ impl<'authority> Authority<'authority> {
     ///
     /// use uriparse::{Authority, Username};
     ///
-    /// let mut reference = Authority::try_from("example.com").unwrap();
-    /// reference.map_username(|_| Some(Username::try_from("username").unwrap()));
-    /// assert_eq!(reference.to_string(), "username@example.com");
+    /// let mut authority = Authority::try_from("example.com").unwrap();
+    /// authority.map_username(|_| Some(Username::try_from("username").unwrap()));
+    /// assert_eq!(authority.to_string(), "username@example.com");
     /// ```
     pub fn map_username<Mapper>(&mut self, mapper: Mapper) -> Option<&Username<'authority>>
     where
@@ -472,11 +472,11 @@ impl<'authority> Authority<'authority> {
     ///
     /// use uriparse::{Authority, Host};
     ///
-    /// let mut reference = Authority::try_from("example.com:8080").unwrap();
-    /// reference.set_host("127.0.0.1");
-    /// assert_eq!(reference.to_string(), "127.0.0.1:8080");
-    /// reference.set_host(Host::IPv6Address("::1".parse().unwrap()));
-    /// assert_eq!(reference.to_string(), "[::1]:8080");
+    /// let mut authority = Authority::try_from("example.com:8080").unwrap();
+    /// authority.set_host("127.0.0.1");
+    /// assert_eq!(authority.to_string(), "127.0.0.1:8080");
+    /// authority.set_host(Host::IPv6Address("::1".parse().unwrap()));
+    /// assert_eq!(authority.to_string(), "[::1]:8080");
     /// ```
     pub fn set_host<HostType, HostError>(
         &mut self,
@@ -506,9 +506,9 @@ impl<'authority> Authority<'authority> {
     ///
     /// use uriparse::Authority;
     ///
-    /// let mut reference = Authority::try_from("example.com").unwrap();
-    /// reference.set_password(Some("secret"));
-    /// assert_eq!(reference.to_string(), ":secret@example.com");
+    /// let mut authority = Authority::try_from("example.com").unwrap();
+    /// authority.set_password(Some("secret"));
+    /// assert_eq!(authority.to_string(), ":secret@example.com");
     /// ```
     pub fn set_password<PasswordType, PasswordError>(
         &mut self,
@@ -544,9 +544,9 @@ impl<'authority> Authority<'authority> {
     ///
     /// use uriparse::Authority;
     ///
-    /// let mut reference = Authority::try_from("example.com").unwrap();
-    /// reference.set_port(Some(8080));
-    /// assert_eq!(reference.to_string(), "example.com:8080");
+    /// let mut authority = Authority::try_from("example.com").unwrap();
+    /// authority.set_port(Some(8080));
+    /// assert_eq!(authority.to_string(), "example.com:8080");
     /// ```
     pub fn set_port(&mut self, port: Option<u16>) -> Option<u16> {
         self.port = port;
@@ -568,13 +568,13 @@ impl<'authority> Authority<'authority> {
     ///
     /// use uriparse::{Authority, Username};
     ///
-    /// let mut reference = Authority::try_from("example.com").unwrap();
-    /// reference.set_username(Some("myname"));
-    /// assert_eq!(reference.to_string(), "myname@example.com");
+    /// let mut authority = Authority::try_from("example.com").unwrap();
+    /// authority.set_username(Some("myname"));
+    /// assert_eq!(authority.to_string(), "myname@example.com");
     ///
-    /// let mut reference = Authority::try_from("user:pass@example.com").unwrap();
-    /// reference.set_username(None::<Username>);
-    /// assert_eq!(reference.to_string(), "example.com");
+    /// let mut authority = Authority::try_from("user:pass@example.com").unwrap();
+    /// authority.set_username(None::<Username>);
+    /// assert_eq!(authority.to_string(), "example.com");
     /// ```
     pub fn set_username<UsernameType, UsernameError>(
         &mut self,
