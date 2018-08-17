@@ -17,7 +17,7 @@ use std::str;
 const MAX_REGISTERED_SCHEME_LENGTH: usize = 36;
 
 /// The number of registered schemes. Make sure to update this whenever adding a new scheme.
-const NUMBER_OF_SCHEMES: usize = 284;
+const NUMBER_OF_SCHEMES: usize = 285;
 
 /// A map of byte characters that determines if a character is a valid scheme character.
 #[cfg_attr(rustfmt, rustfmt_skip)]
