@@ -573,6 +573,7 @@ schemes! {
     (Barion, "barion", SchemeStatus::Provisional);
     (BeShare, "beshare", SchemeStatus::Provisional);
     (Bitcoin, "bitcoin", SchemeStatus::Provisional);
+    (BitcoinCash, "bitcoincash", SchemeStatus::Provisional);
     (Blob, "blob", SchemeStatus::Provisional);
     (Bolo, "bolo", SchemeStatus::Provisional);
     (BrowserExt, "browserext", SchemeStatus::Provisional);
