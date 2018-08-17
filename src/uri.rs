@@ -21,6 +21,7 @@
 use std::convert::TryFrom;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter, Write};
+use std::mem;
 
 use authority::{parse_authority, Authority, Host, InvalidAuthority, Password, Username};
 use fragment::{Fragment, InvalidFragment};
@@ -409,6 +410,104 @@ impl<'uri> RelativeReference<'uri> {
         self.uri_reference.is_relative_path_reference()
     }
 
+    /// Maps the authority using the given map function.
+    ///
+    /// This function will panic if, as a result of the authority change, the relative reference
+    /// becomes invalid.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Authority, RelativeReference};
+    ///
+    /// let mut reference = RelativeReference::try_from("").unwrap();
+    /// reference.map_authority(|_| Some(Authority::try_from("127.0.0.1").unwrap()));
+    /// assert_eq!(reference.to_string(), "//127.0.0.1/");
+    /// ```
+    pub fn map_authority<Mapper>(&mut self, mapper: Mapper) -> Option<&Authority<'uri>>
+    where
+        Mapper: FnOnce(Option<Authority<'uri>>) -> Option<Authority<'uri>>,
+    {
+        self.uri_reference.map_authority(mapper)
+    }
+
+    /// Maps the fragment using the given map function.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Fragment, RelativeReference};
+    ///
+    /// let mut reference = RelativeReference::try_from("/").unwrap();
+    /// reference.map_fragment(|_| Some(Fragment::try_from("fragment").unwrap()));
+    /// assert_eq!(reference.to_string(), "/#fragment");
+    /// ```
+    pub fn map_fragment<Mapper>(&mut self, mapper: Mapper) -> Option<&Fragment<'uri>>
+    where
+        Mapper: FnOnce(Option<Fragment<'uri>>) -> Option<Fragment<'uri>>,
+    {
+        self.uri_reference.map_fragment(mapper)
+    }
+
+    /// Maps the path using the given map function.
+    ///
+    /// This function will panic if, as a result of the path change, the relative reference becomes
+    /// invalid.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Authority, URIReference};
+    ///
+    /// let mut reference = URIReference::try_from("").unwrap();
+    /// reference.map_path(|mut path| {
+    ///     path.push("test").unwrap();
+    ///     path.push("path").unwrap();
+    ///     path
+    /// });
+    /// assert_eq!(reference.to_string(), "test/path");
+    /// ```
+    pub fn map_path<Mapper>(&mut self, mapper: Mapper) -> &Path<'uri>
+    where
+        Mapper: FnOnce(Path<'uri>) -> Path<'uri>,
+    {
+        self.uri_reference.map_path(mapper)
+    }
+
+    /// Maps the query using the given map function.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Query, RelativeReference};
+    ///
+    /// let mut reference = RelativeReference::try_from("/path").unwrap();
+    /// reference.map_query(|_| Some(Query::try_from("query").unwrap()));
+    /// assert_eq!(reference.to_string(), "/path?query");
+    /// ```
+    pub fn map_query<Mapper>(&mut self, mapper: Mapper) -> Option<&Query<'uri>>
+    where
+        Mapper: FnOnce(Option<Query<'uri>>) -> Option<Query<'uri>>,
+    {
+        self.uri_reference.map_query(mapper)
+    }
+
     /// Returns the path of the relative reference.
     ///
     /// # Examples
@@ -481,6 +580,133 @@ impl<'uri> RelativeReference<'uri> {
     /// ```
     pub fn query(&self) -> Option<&Query<'uri>> {
         self.uri_reference.query()
+    }
+
+    /// Sets the authority of the relative reference.
+    ///
+    /// An error will be returned if the conversion to an [`Authority`] fails.
+    ///
+    /// The existing path will be set to absolute (i.e. starts with a `'/'`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::RelativeReference;
+    ///
+    /// let mut reference = RelativeReference::try_from("//example.com").unwrap();
+    /// reference.set_authority(Some("user@example.com:80"));
+    /// assert_eq!(reference.to_string(), "//user@example.com:80/");
+    /// ```
+    pub fn set_authority<AuthorityType, AuthorityError>(
+        &mut self,
+        authority: Option<AuthorityType>,
+    ) -> Result<Option<&Authority<'uri>>, InvalidRelativeReference>
+    where
+        Authority<'uri>: TryFrom<AuthorityType, Error = AuthorityError>,
+        InvalidURIReference: From<AuthorityError>,
+    {
+        self.uri_reference
+            .set_authority(authority)
+            .map_err(|error| InvalidRelativeReference::try_from(error).unwrap())
+    }
+
+    /// Sets the fragment of the relative reference.
+    ///
+    /// An error will be returned if the conversion to a [`Fragment`] fails.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::RelativeReference;
+    ///
+    /// let mut reference = RelativeReference::try_from("/my/path").unwrap();
+    /// reference.set_fragment(Some("fragment"));
+    /// assert_eq!(reference.to_string(), "/my/path#fragment");
+    /// ```
+    pub fn set_fragment<FragmentType, FragmentError>(
+        &mut self,
+        fragment: Option<FragmentType>,
+    ) -> Result<Option<&Fragment<'uri>>, InvalidRelativeReference>
+    where
+        Fragment<'uri>: TryFrom<FragmentType, Error = FragmentError>,
+        InvalidURIReference: From<FragmentError>,
+    {
+        self.uri_reference
+            .set_fragment(fragment)
+            .map_err(|error| InvalidRelativeReference::try_from(error).unwrap())
+    }
+
+    /// Sets the path of the relative reference.
+    ///
+    /// An error will be returned in one of two cases:
+    ///  - The conversion to [`Path`] failed.
+    ///  - The path was set to a value that resulted in an invalid URI reference.
+    ///
+    /// Regardless of whether or not the given path was set as absolute or relative, if the relative
+    /// reference currently has an authority, the path will be forced to be absolute.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::RelativeReference;
+    ///
+    /// let mut reference = RelativeReference::try_from("").unwrap();
+    /// reference.set_path("my/path");
+    /// assert_eq!(reference.to_string(), "my/path");
+    /// ```
+    pub fn set_path<PathType, PathError>(
+        &mut self,
+        path: PathType,
+    ) -> Result<&Path<'uri>, InvalidRelativeReference>
+    where
+        Path<'uri>: TryFrom<PathType, Error = PathError>,
+        InvalidURIReference: From<PathError>,
+    {
+        self.uri_reference
+            .set_path(path)
+            .map_err(|error| InvalidRelativeReference::try_from(error).unwrap())
+    }
+
+    /// Sets the query of the relative reference.
+    ///
+    /// An error will be returned if the conversion to a [`Query`] fails.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::RelativeReference;
+    ///
+    /// let mut reference = RelativeReference::try_from("").unwrap();
+    /// reference.set_query(Some("myquery"));
+    /// assert_eq!(reference.to_string(), "?myquery");
+    /// ```
+    pub fn set_query<QueryType, QueryError>(
+        &mut self,
+        query: Option<QueryType>,
+    ) -> Result<Option<&Query<'uri>>, InvalidRelativeReference>
+    where
+        Query<'uri>: TryFrom<QueryType, Error = QueryError>,
+        InvalidURIReference: From<QueryError>,
+    {
+        self.uri_reference
+            .set_query(query)
+            .map_err(|error| InvalidRelativeReference::try_from(error).unwrap())
     }
 
     /// Returns the username, if present, of the relative reference.
@@ -1104,6 +1330,126 @@ impl<'uri> URI<'uri> {
         (scheme.unwrap(), authority, path, query, fragment)
     }
 
+    /// Maps the authority using the given map function.
+    ///
+    /// This function will panic if, as a result of the authority change, the URI reference becomes
+    /// invalid.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Authority, URI};
+    ///
+    /// let mut uri = URI::try_from("http://example.com").unwrap();
+    /// uri.map_authority(|_| Some(Authority::try_from("127.0.0.1").unwrap()));
+    /// assert_eq!(uri.to_string(), "http://127.0.0.1/");
+    /// ```
+    pub fn map_authority<Mapper>(&mut self, mapper: Mapper) -> Option<&Authority<'uri>>
+    where
+        Mapper: FnOnce(Option<Authority<'uri>>) -> Option<Authority<'uri>>,
+    {
+        self.uri_reference.map_authority(mapper)
+    }
+
+    /// Maps the fragment using the given map function.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Fragment, URI};
+    ///
+    /// let mut uri = URI::try_from("http://example.com").unwrap();
+    /// uri.map_fragment(|_| Some(Fragment::try_from("fragment").unwrap()));
+    /// assert_eq!(uri.to_string(), "http://example.com/#fragment");
+    /// ```
+    pub fn map_fragment<Mapper>(&mut self, mapper: Mapper) -> Option<&Fragment<'uri>>
+    where
+        Mapper: FnOnce(Option<Fragment<'uri>>) -> Option<Fragment<'uri>>,
+    {
+        self.uri_reference.map_fragment(mapper)
+    }
+
+    /// Maps the path using the given map function.
+    ///
+    /// This function will panic if, as a result of the path change, the URI becomes invalid.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Authority, URI};
+    ///
+    /// let mut uri = URI::try_from("http://example.com").unwrap();
+    /// uri.map_path(|mut path| {
+    ///     path.push("test").unwrap();
+    ///     path.push("path").unwrap();
+    ///     path
+    /// });
+    /// assert_eq!(uri.to_string(), "http://example.com/test/path");
+    /// ```
+    pub fn map_path<Mapper>(&mut self, mapper: Mapper) -> &Path<'uri>
+    where
+        Mapper: FnOnce(Path<'uri>) -> Path<'uri>,
+    {
+        self.uri_reference.map_path(mapper)
+    }
+
+    /// Maps the query using the given map function.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Query, URI};
+    ///
+    /// let mut uri = URI::try_from("http://example.com").unwrap();
+    /// uri.map_query(|_| Some(Query::try_from("query").unwrap()));
+    /// assert_eq!(uri.to_string(), "http://example.com/?query");
+    /// ```
+    pub fn map_query<Mapper>(&mut self, mapper: Mapper) -> Option<&Query<'uri>>
+    where
+        Mapper: FnOnce(Option<Query<'uri>>) -> Option<Query<'uri>>,
+    {
+        self.uri_reference.map_query(mapper)
+    }
+
+    /// Maps the scheme using the given map function.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Scheme, URI};
+    ///
+    /// let mut uri = URI::try_from("http://example.com").unwrap();
+    /// uri.map_scheme(|_| Scheme::try_from("https").unwrap());
+    /// assert_eq!(uri.to_string(), "https://example.com/");
+    /// ```
+    pub fn map_scheme<Mapper>(&mut self, mapper: Mapper) -> Option<&Scheme<'uri>>
+    where
+        Mapper: FnOnce(Scheme<'uri>) -> Scheme<'uri>,
+    {
+        self.uri_reference
+            .map_scheme(|scheme| Some(mapper(scheme.unwrap())))
+    }
+
     /// Returns the path of the URI.
     ///
     /// # Examples
@@ -1194,6 +1540,164 @@ impl<'uri> URI<'uri> {
     /// ```
     pub fn scheme(&self) -> &Scheme<'uri> {
         self.uri_reference.scheme().unwrap()
+    }
+
+    /// Sets the authority of the URI.
+    ///
+    /// An error will be returned if the conversion to an [`Authority`] fails.
+    ///
+    /// The existing path will be set to absolute (i.e. starts with a `'/'`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URI;
+    ///
+    /// let mut uri = URI::try_from("http://example.com").unwrap();
+    /// uri.set_authority(Some("user@example.com:80"));
+    /// assert_eq!(uri.to_string(), "http://user@example.com:80/");
+    /// ```
+    pub fn set_authority<AuthorityType, AuthorityError>(
+        &mut self,
+        authority: Option<AuthorityType>,
+    ) -> Result<Option<&Authority<'uri>>, InvalidURI>
+    where
+        Authority<'uri>: TryFrom<AuthorityType, Error = AuthorityError>,
+        InvalidURIReference: From<AuthorityError>,
+    {
+        self.uri_reference
+            .set_authority(authority)
+            .map_err(|error| InvalidURI::try_from(error).unwrap())
+    }
+
+    /// Sets the fragment of the URI.
+    ///
+    /// An error will be returned if the conversion to a [`Fragment`] fails.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URI;
+    ///
+    /// let mut uri = URI::try_from("http://example.com").unwrap();
+    /// uri.set_fragment(Some("fragment"));
+    /// assert_eq!(uri.to_string(), "http://example.com/#fragment");
+    /// ```
+    pub fn set_fragment<FragmentType, FragmentError>(
+        &mut self,
+        fragment: Option<FragmentType>,
+    ) -> Result<Option<&Fragment<'uri>>, InvalidURI>
+    where
+        Fragment<'uri>: TryFrom<FragmentType, Error = FragmentError>,
+        InvalidURIReference: From<FragmentError>,
+    {
+        self.uri_reference
+            .set_fragment(fragment)
+            .map_err(|error| InvalidURI::try_from(error).unwrap())
+    }
+
+    /// Sets the path of the URI.
+    ///
+    /// An error will be returned in one of two cases:
+    ///  - The conversion to [`Path`] failed.
+    ///  - The path was set to a value that resulted in an invalid URI.
+    ///
+    /// Regardless of whether or not the given path was set as absolute or relative, if the URI
+    /// reference currently has an authority, the path will be forced to be absolute.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URI;
+    ///
+    /// let mut uri = URI::try_from("http://example.com").unwrap();
+    /// uri.set_path("my/path");
+    /// assert_eq!(uri.to_string(), "http://example.com/my/path");
+    /// ```
+    pub fn set_path<PathType, PathError>(
+        &mut self,
+        path: PathType,
+    ) -> Result<&Path<'uri>, InvalidURI>
+    where
+        Path<'uri>: TryFrom<PathType, Error = PathError>,
+        InvalidURIReference: From<PathError>,
+    {
+        self.uri_reference
+            .set_path(path)
+            .map_err(|error| InvalidURI::try_from(error).unwrap())
+    }
+
+    /// Sets the query of the URI.
+    ///
+    /// An error will be returned if the conversion to a [`Query`] fails.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URI;
+    ///
+    /// let mut uri = URI::try_from("http://example.com").unwrap();
+    /// uri.set_query(Some("myquery"));
+    /// assert_eq!(uri.to_string(), "http://example.com/?myquery");
+    /// ```
+    pub fn set_query<QueryType, QueryError>(
+        &mut self,
+        query: Option<QueryType>,
+    ) -> Result<Option<&Query<'uri>>, InvalidURI>
+    where
+        Query<'uri>: TryFrom<QueryType, Error = QueryError>,
+        InvalidURIReference: From<QueryError>,
+    {
+        self.uri_reference
+            .set_query(query)
+            .map_err(|error| InvalidURI::try_from(error).unwrap())
+    }
+
+    /// Sets the scheme of the URI.
+    ///
+    /// An error will be returned if the conversion to a [`Scheme`] fails.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URI;
+    ///
+    /// let mut uri = URI::try_from("http://example.com").unwrap();
+    /// uri.set_scheme("https");
+    /// assert_eq!(uri.to_string(), "https://example.com/");
+    /// ```
+    pub fn set_scheme<SchemeType, SchemeError>(
+        &mut self,
+        scheme: SchemeType,
+    ) -> Result<&Scheme<'uri>, InvalidURI>
+    where
+        Scheme<'uri>: TryFrom<SchemeType, Error = SchemeError>,
+        InvalidURIReference: From<SchemeError>,
+    {
+        self.uri_reference
+            .set_scheme(Some(scheme))
+            .map_err(|error| InvalidURI::try_from(error).unwrap())?;
+        Ok(self.scheme())
     }
 
     /// Returns the username, if present, of the URI.
@@ -1628,28 +2132,12 @@ impl<'uri> URIReference<'uri> {
 
         let mut path = Path::try_from(path)?;
 
-        if scheme.is_some()
-            && authority.is_none()
-            && path.segments().len() > 1
-            && path.segments().first().unwrap().is_empty()
-        {
-            return Err(InvalidURIReference::AbsolutePathCannotStartWithTwoSlashes);
-        }
-
-        if scheme.is_none() && authority.is_none()
-            && path
-                .segments()
-                .first()
-                .unwrap()
-                .bytes()
-                .any(|byte| byte == b':')
-        {
-            return Err(InvalidURIReference::SchemelessPathCannotStartWithColonSegment);
-        }
-
         if authority.is_some() {
             path.set_absolute(true);
         }
+
+        validate_absolute_path(authority.as_ref(), &path)?;
+        validate_schemeless_path(scheme.as_ref(), authority.as_ref(), &path)?;
 
         let query = match query {
             Some(query) => Some(Query::try_from(query)?),
@@ -2040,6 +2528,140 @@ impl<'uri> URIReference<'uri> {
         self.scheme.is_some()
     }
 
+    /// Maps the authority using the given map function.
+    ///
+    /// This function will panic if, as a result of the authority change, the URI reference becomes
+    /// invalid.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Authority, URIReference};
+    ///
+    /// let mut reference = URIReference::try_from("http://example.com").unwrap();
+    /// reference.map_authority(|_| Some(Authority::try_from("127.0.0.1").unwrap()));
+    /// assert_eq!(reference.to_string(), "http://127.0.0.1/");
+    /// ```
+    pub fn map_authority<Mapper>(&mut self, mapper: Mapper) -> Option<&Authority<'uri>>
+    where
+        Mapper: FnOnce(Option<Authority<'uri>>) -> Option<Authority<'uri>>,
+    {
+        let authority = mapper(self.authority.take());
+        self.set_authority(authority)
+            .expect("mapped authority resulted in invalid state")
+    }
+
+    /// Maps the fragment using the given map function.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Fragment, URIReference};
+    ///
+    /// let mut reference = URIReference::try_from("http://example.com").unwrap();
+    /// reference.map_fragment(|_| Some(Fragment::try_from("fragment").unwrap()));
+    /// assert_eq!(reference.to_string(), "http://example.com/#fragment");
+    /// ```
+    pub fn map_fragment<Mapper>(&mut self, mapper: Mapper) -> Option<&Fragment<'uri>>
+    where
+        Mapper: FnOnce(Option<Fragment<'uri>>) -> Option<Fragment<'uri>>,
+    {
+        let fragment = mapper(self.fragment.take());
+        self.set_fragment(fragment)
+            .expect("mapped fragment resulted in invalid state")
+    }
+
+    /// Maps the path using the given map function.
+    ///
+    /// This function will panic if, as a result of the path change, the URI reference becomes
+    /// invalid.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Authority, URIReference};
+    ///
+    /// let mut reference = URIReference::try_from("http://example.com").unwrap();
+    /// reference.map_path(|mut path| {
+    ///     path.push("test").unwrap();
+    ///     path.push("path").unwrap();
+    ///     path
+    /// });
+    /// assert_eq!(reference.to_string(), "http://example.com/test/path");
+    /// ```
+    pub fn map_path<Mapper>(&mut self, mapper: Mapper) -> &Path<'uri>
+    where
+        Mapper: FnOnce(Path<'uri>) -> Path<'uri>,
+    {
+        let temp_path = unsafe { Path::new_with_no_segments(true) };
+        let path = mapper(mem::replace(&mut self.path, temp_path));
+        self.set_path(path)
+            .expect("mapped path resulted in invalid state")
+    }
+
+    /// Maps the query using the given map function.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Query, URIReference};
+    ///
+    /// let mut reference = URIReference::try_from("http://example.com").unwrap();
+    /// reference.map_query(|_| Some(Query::try_from("query").unwrap()));
+    /// assert_eq!(reference.to_string(), "http://example.com/?query");
+    /// ```
+    pub fn map_query<Mapper>(&mut self, mapper: Mapper) -> Option<&Query<'uri>>
+    where
+        Mapper: FnOnce(Option<Query<'uri>>) -> Option<Query<'uri>>,
+    {
+        let query = mapper(self.query.take());
+        self.set_query(query)
+            .expect("mapped query resulted in invalid state")
+    }
+
+    /// Maps the scheme using the given map function.
+    ///
+    /// This function will panic if, as a result of the scheme change, the URI reference becomes
+    /// invalid.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Scheme, URIReference};
+    ///
+    /// let mut reference = URIReference::try_from("http://example.com").unwrap();
+    /// reference.map_scheme(|_| Some(Scheme::try_from("https").unwrap()));
+    /// assert_eq!(reference.to_string(), "https://example.com/");
+    /// ```
+    pub fn map_scheme<Mapper>(&mut self, mapper: Mapper) -> Option<&Scheme<'uri>>
+    where
+        Mapper: FnOnce(Option<Scheme<'uri>>) -> Option<Scheme<'uri>>,
+    {
+        let scheme = mapper(self.scheme.take());
+        self.set_scheme(scheme)
+            .expect("mapped scheme resulted in invalid state")
+    }
+
     /// Returns the path of the URI reference.
     ///
     /// # Examples
@@ -2138,6 +2760,190 @@ impl<'uri> URIReference<'uri> {
     /// ```
     pub fn scheme(&self) -> Option<&Scheme<'uri>> {
         self.scheme.as_ref()
+    }
+
+    /// Sets the authority of the URI reference.
+    ///
+    /// An error will be returned if the conversion to an [`Authority`] fails.
+    ///
+    /// The existing path will be set to absolute (i.e. starts with a `'/'`).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let mut reference = URIReference::try_from("http://example.com").unwrap();
+    /// reference.set_authority(Some("user@example.com:80"));
+    /// assert_eq!(reference.to_string(), "http://user@example.com:80/");
+    /// ```
+    pub fn set_authority<AuthorityType, AuthorityError>(
+        &mut self,
+        authority: Option<AuthorityType>,
+    ) -> Result<Option<&Authority<'uri>>, InvalidURIReference>
+    where
+        Authority<'uri>: TryFrom<AuthorityType, Error = AuthorityError>,
+        InvalidURIReference: From<AuthorityError>,
+    {
+        self.authority = match authority {
+            Some(authority) => {
+                self.path.set_absolute(true);
+                Some(Authority::try_from(authority)?)
+            }
+            None => {
+                validate_absolute_path(None, &self.path)?;
+                None
+            }
+        };
+        Ok(self.authority())
+    }
+
+    /// Sets the fragment of the URI reference.
+    ///
+    /// An error will be returned if the conversion to a [`Fragment`] fails.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let mut reference = URIReference::try_from("http://example.com").unwrap();
+    /// reference.set_fragment(Some("fragment"));
+    /// assert_eq!(reference.to_string(), "http://example.com/#fragment");
+    /// ```
+    pub fn set_fragment<FragmentType, FragmentError>(
+        &mut self,
+        fragment: Option<FragmentType>,
+    ) -> Result<Option<&Fragment<'uri>>, InvalidURIReference>
+    where
+        Fragment<'uri>: TryFrom<FragmentType, Error = FragmentError>,
+        InvalidURIReference: From<FragmentError>,
+    {
+        self.fragment = match fragment {
+            Some(fragment) => Some(Fragment::try_from(fragment)?),
+            None => None,
+        };
+        Ok(self.fragment())
+    }
+
+    /// Sets the path of the URI reference.
+    ///
+    /// An error will be returned in one of two cases:
+    ///  - The conversion to [`Path`] failed.
+    ///  - The path was set to a value that resulted in an invalid URI reference.
+    ///
+    /// Regardless of whether or not the given path was set as absolute or relative, if the URI
+    /// reference currently has an authority, the path will be forced to be absolute.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let mut reference = URIReference::try_from("http://example.com").unwrap();
+    /// reference.set_path("my/path");
+    /// assert_eq!(reference.to_string(), "http://example.com/my/path");
+    /// ```
+    pub fn set_path<PathType, PathError>(
+        &mut self,
+        path: PathType,
+    ) -> Result<&Path<'uri>, InvalidURIReference>
+    where
+        Path<'uri>: TryFrom<PathType, Error = PathError>,
+        InvalidURIReference: From<PathError>,
+    {
+        let mut path = Path::try_from(path)?;
+        validate_absolute_path(self.authority.as_ref(), &path)?;
+        validate_schemeless_path(self.scheme.as_ref(), self.authority.as_ref(), &path)?;
+
+        if self.authority.is_some() {
+            path.set_absolute(true);
+        }
+
+        self.path = path;
+        Ok(self.path())
+    }
+
+    /// Sets the query of the URI reference.
+    ///
+    /// An error will be returned if the conversion to a [`Query`] fails.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let mut reference = URIReference::try_from("http://example.com").unwrap();
+    /// reference.set_query(Some("myquery"));
+    /// assert_eq!(reference.to_string(), "http://example.com/?myquery");
+    /// ```
+    pub fn set_query<QueryType, QueryError>(
+        &mut self,
+        query: Option<QueryType>,
+    ) -> Result<Option<&Query<'uri>>, InvalidURIReference>
+    where
+        Query<'uri>: TryFrom<QueryType, Error = QueryError>,
+        InvalidURIReference: From<QueryError>,
+    {
+        self.query = match query {
+            Some(query) => Some(Query::try_from(query)?),
+            None => None,
+        };
+        Ok(self.query())
+    }
+
+    /// Sets the scheme of the URI reference.
+    ///
+    /// An error will be returned in one of two cases:
+    ///  - The conversion to [`Scheme`] failed.
+    ///  - The scheme was set to `None`, but the resulting URI reference has an invalid schemeless
+    ///    path.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let mut reference = URIReference::try_from("http://example.com").unwrap();
+    /// reference.set_scheme(Some("https"));
+    /// assert_eq!(reference.to_string(), "https://example.com/");
+    /// ```
+    pub fn set_scheme<SchemeType, SchemeError>(
+        &mut self,
+        scheme: Option<SchemeType>,
+    ) -> Result<Option<&Scheme<'uri>>, InvalidURIReference>
+    where
+        Scheme<'uri>: TryFrom<SchemeType, Error = SchemeError>,
+        InvalidURIReference: From<SchemeError>,
+    {
+        self.scheme = match scheme {
+            Some(scheme) => Some(Scheme::try_from(scheme)?),
+            None => {
+                validate_schemeless_path(None, self.authority.as_ref(), &self.path)?;
+                None
+            }
+        };
+        Ok(self.scheme())
     }
 
     /// Returns the username, if present, of the URI reference.
@@ -2854,6 +3660,40 @@ impl From<InvalidQuery> for InvalidURIReference {
 impl From<InvalidScheme> for InvalidURIReference {
     fn from(value: InvalidScheme) -> Self {
         InvalidURIReference::InvalidScheme(value)
+    }
+}
+
+fn validate_absolute_path(
+    authority: Option<&Authority>,
+    path: &Path,
+) -> Result<(), InvalidURIReference> {
+    if authority.is_some()
+        || path.is_relative()
+        || path.segments().len() == 1
+        || !path.segments().first().unwrap().is_empty()
+    {
+        Ok(())
+    } else {
+        Err(InvalidURIReference::AbsolutePathCannotStartWithTwoSlashes)
+    }
+}
+
+fn validate_schemeless_path(
+    scheme: Option<&Scheme>,
+    authority: Option<&Authority>,
+    path: &Path,
+) -> Result<(), InvalidURIReference> {
+    if scheme.is_some() || authority.is_some()
+        || !path
+            .segments()
+            .first()
+            .unwrap()
+            .bytes()
+            .any(|byte| byte == b':')
+    {
+        Ok(())
+    } else {
+        Err(InvalidURIReference::SchemelessPathCannotStartWithColonSegment)
     }
 }
 
