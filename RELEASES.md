@@ -1,3 +1,24 @@
+# 0.3.0
+ - Fix serialization of IPv6 addresses.
+ - Changed behavior of `Path::push` when the current path is just one empty segment. For example:
+
+```rust
+let mut path = Path::try_from("/").unwrap();
+path.push("test");
+assert_eq!(path, "/test"); // Before, the path would have been `"//test"`.
+```
+
+   But the ability to make paths with a `"//"` prefix is still possible:
+
+```rust
+let mut path = Path::try_from("/").unwrap();
+path.push("");
+assert_eq!(path, "//"); // This conforms to the previous functionality.
+```
+
+ - Added authority mutability functions.
+ - Added URI mutability functions.
+
 # 0.2.1
 
  - Added more conversions between types.
