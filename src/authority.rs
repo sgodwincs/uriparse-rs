@@ -1302,10 +1302,7 @@ impl<'username> TryFrom<&'username [u8]> for Username<'username> {
     type Error = InvalidUserInfo;
 
     fn try_from(value: &'username [u8]) -> Result<Self, Self::Error> {
-        if let Some(_) = check_user_info(value)? {
-            return Err(InvalidUserInfo::InvalidCharacter);
-        }
-
+        check_user_info(value)?;
         let username = Username(Cow::from(unsafe { str::from_utf8_unchecked(value) }));
         Ok(username)
     }
