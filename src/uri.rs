@@ -10,13 +10,6 @@
 //! As a result, choose the type that best fits your use case. If you need absolute URIs, you should
 //! use [`URI`], but if you want relative references (e.g. `"/"` in a GET request) use
 //! [`RelativeReference`]. If you can accept both, then use [`URIReference`].
-//!
-//! Each type also has a corresponding builder type to allow for convenient construction and
-//! modification via the [`RelativeReference::into_builder`], [`URI::into_builder`] and
-//! [`URIReference::into_builder`] functions.
-//!
-//! All three types are immutable, so if you want to change a component such as the path, you need
-//! to reconstruct the type via either the builder or by converting it into its parts and back.
 
 use std::convert::TryFrom;
 use std::error::Error;
@@ -3683,13 +3676,12 @@ fn validate_schemeless_path(
     authority: Option<&Authority>,
     path: &Path,
 ) -> Result<(), InvalidURIReference> {
-    if scheme.is_some() || authority.is_some()
-        || !path
-            .segments()
-            .first()
-            .unwrap()
-            .bytes()
-            .any(|byte| byte == b':')
+    if scheme.is_some() || authority.is_some() || !path
+        .segments()
+        .first()
+        .unwrap()
+        .bytes()
+        .any(|byte| byte == b':')
     {
         Ok(())
     } else {
