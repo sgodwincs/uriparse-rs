@@ -17,7 +17,7 @@ use std::str;
 const MAX_REGISTERED_SCHEME_LENGTH: usize = 36;
 
 /// The number of registered schemes. Make sure to update this whenever adding a new scheme.
-const NUMBER_OF_SCHEMES: usize = 285;
+const NUMBER_OF_SCHEMES: usize = 289;
 
 /// A map of byte characters that determines if a character is a valid scheme character.
 #[cfg_attr(rustfmt, rustfmt_skip)]
@@ -681,6 +681,7 @@ schemes! {
     (MSDriverTo, "ms-drive-to", SchemeStatus::Provisional);
     (MSEnrollment, "ms-enrollment", SchemeStatus::Provisional);
     (MSExcel, "ms-excel", SchemeStatus::Provisional);
+    (MSEyeControlSpeech, "ms-eyecontrolspeech", SchemeStatus::Provisional);
     (MSGameBarServices, "ms-gamebaresrvices", SchemeStatus::Provisional);
     (MSGamingOverlay, "ms-gamingoverlay", SchemeStatus::Provisional);
     (MSGetOffice, "ms-getoffice", SchemeStatus::Provisional);
@@ -696,6 +697,9 @@ schemes! {
     (MSPowerPoint, "ms-powerpoint", SchemeStatus::Provisional);
     (MSPublisher, "ms-publisher", SchemeStatus::Provisional);
     (MSRestoreTabCompanion, "ms-restoretabcompanion", SchemeStatus::Provisional);
+    (MSScreenClip, "ms-screenclip", SchemeStatus::Provisional);
+    (MSScreenSketch, "ms-screensketch", SchemeStatus::Provisional);
+    (MSSearch, "ms-search", SchemeStatus::Provisional);
     (MSSearchRepair, "ms-search-repair", SchemeStatus::Provisional);
     (MSSecondaryScreenController, "ms-secondary-screen-controller", SchemeStatus::Provisional);
     (MSSeocndaryScreenSetup, "ms-secondary-screen-setup", SchemeStatus::Provisional);
