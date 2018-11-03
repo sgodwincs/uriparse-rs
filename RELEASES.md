@@ -1,4 +1,23 @@
+# 0.3.3
+
+ - Add new schemes:
+   * ms-eyecontrolspeech
+   * ms-screenclip
+   * ms-screensketch
+   * ms-search
+ - Small amount of refactoring.
+
+# 0.3.2
+
+ - Update number of schemes to include the newest from v0.3.1.
+
+# 0.3.1
+
+ - Add new schemes:
+   * bitcoincash
+
 # 0.3.0
+
  - Fix serialization of IPv6 addresses.
  - Changed behavior of `Path::push` when the current path is just one empty segment. For example:
 
