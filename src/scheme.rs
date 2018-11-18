@@ -18,7 +18,7 @@ use std::str;
 const MAX_REGISTERED_SCHEME_LENGTH: usize = 36;
 
 /// The number of registered schemes. Make sure to update this whenever adding a new scheme.
-const NUMBER_OF_SCHEMES: usize = 289;
+const NUMBER_OF_SCHEMES: usize = 291;
 
 /// A map of byte characters that determines if a character is a valid scheme character.
 #[cfg_attr(rustfmt, rustfmt_skip)]
@@ -578,6 +578,7 @@ schemes! {
     (Blob, "blob", SchemeStatus::Provisional);
     (Bolo, "bolo", SchemeStatus::Provisional);
     (BrowserExt, "browserext", SchemeStatus::Provisional);
+    (Calculator, "calculator", SchemeStatus::Provisional);
     (CallTo, "callto", SchemeStatus::Provisional);
     (CAP, "cap", SchemeStatus::Permanent);
     (Chrome, "chrome", SchemeStatus::Provisional);
@@ -679,7 +680,8 @@ schemes! {
     (Moz, "moz", SchemeStatus::Provisional);
     (MSAccess, "ms-access", SchemeStatus::Provisional);
     (MSBrowserExtension, "ms-browser-extension", SchemeStatus::Provisional);
-    (MSDriverTo, "ms-drive-to", SchemeStatus::Provisional);
+    (MSCalculator, "ms-calculator", SchemeStatus::Provisional);
+    (MSDriveTo, "ms-drive-to", SchemeStatus::Provisional);
     (MSEnrollment, "ms-enrollment", SchemeStatus::Provisional);
     (MSExcel, "ms-excel", SchemeStatus::Provisional);
     (MSEyeControlSpeech, "ms-eyecontrolspeech", SchemeStatus::Provisional);
