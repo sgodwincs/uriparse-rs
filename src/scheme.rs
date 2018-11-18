@@ -4,6 +4,7 @@
 //! the listed schemes, see
 //! [iana.org](https://www.iana.org/assignments/uri-schemes/uri-schemes.xhtml).
 
+use lazy_static::lazy_static;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::convert::TryFrom;

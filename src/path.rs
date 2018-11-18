@@ -10,7 +10,7 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::str;
 
-use utility::{percent_encoded_equality, percent_encoded_hash};
+use crate::utility::{percent_encoded_equality, percent_encoded_hash};
 
 /// A map of byte characters that determines if a character is a valid path character.
 #[cfg_attr(rustfmt, rustfmt_skip)]
@@ -312,9 +312,11 @@ impl<'path> PartialEq<[u8]> for Path<'path> {
     fn eq(&self, mut other: &[u8]) -> bool {
         if self.absolute {
             match other.get(0) {
-                Some(&byte) => if byte != b'/' {
-                    return false;
-                },
+                Some(&byte) => {
+                    if byte != b'/' {
+                        return false;
+                    }
+                }
                 None => return false,
             }
 
@@ -332,9 +334,11 @@ impl<'path> PartialEq<[u8]> for Path<'path> {
 
             if index < self.segments.len() - 1 {
                 match other.get(0) {
-                    Some(&byte) => if byte != b'/' {
-                        return false;
-                    },
+                    Some(&byte) => {
+                        if byte != b'/' {
+                            return false;
+                        }
+                    }
                     None => return false,
                 }
 

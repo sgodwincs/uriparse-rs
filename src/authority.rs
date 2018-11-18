@@ -40,7 +40,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::ops::Deref;
 use std::str;
 
-use utility::{percent_encoded_equality, percent_encoded_hash};
+use crate::utility::{percent_encoded_equality, percent_encoded_hash};
 
 /// A map of byte characters that determines if a character is a valid IPv4 or registered name
 /// character.
@@ -1561,9 +1561,11 @@ fn check_user_info(value: &[u8]) -> Result<Option<usize>, InvalidUserInfo> {
                 }
                 _ => return Err(InvalidUserInfo::InvalidPercentEncoding),
             },
-            b':' => if first_colon_index.is_none() {
-                first_colon_index = Some(index);
-            },
+            b':' => {
+                if first_colon_index.is_none() {
+                    first_colon_index = Some(index);
+                }
+            }
             _ => (),
         }
     }
@@ -1581,10 +1583,12 @@ pub(crate) fn parse_authority<'authority>(
 
     for (index, &byte) in value.iter().enumerate() {
         match byte {
-            b'@' => if at_index.is_none() {
-                at_index = Some(index);
-                last_colon_index = None;
-            },
+            b'@' => {
+                if at_index.is_none() {
+                    at_index = Some(index);
+                    last_colon_index = None;
+                }
+            }
             b':' => last_colon_index = Some(index),
             b']' => last_colon_index = None,
             b'/' | b'?' | b'#' => {
@@ -1662,9 +1666,11 @@ fn parse_user_info<'user_info>(
                 }
                 _ => return Err(InvalidUserInfo::InvalidPercentEncoding),
             },
-            b':' => if first_colon_index.is_none() {
-                first_colon_index = Some(index);
-            },
+            b':' => {
+                if first_colon_index.is_none() {
+                    first_colon_index = Some(index);
+                }
+            }
             _ => (),
         }
     }

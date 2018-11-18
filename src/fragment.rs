@@ -10,7 +10,7 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::str;
 
-use utility::{percent_encoded_equality, percent_encoded_hash};
+use crate::utility::{percent_encoded_equality, percent_encoded_hash};
 
 /// A map of byte characters that determines if a character is a valid fragment character.
 #[cfg_attr(rustfmt, rustfmt_skip)]

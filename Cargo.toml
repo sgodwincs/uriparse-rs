@@ -2,6 +2,7 @@
 authors = ["Scott Godwin <sgodwincs@gmail.com>"]
 categories = ["parsing"]
 description = "A URI parser including relative references"
+edition = "2018"
 homepage = "https://github.com/sgodwincs/uriparse-rs"
 license = "MIT"
 name = "uriparse"
@@ -14,7 +15,7 @@ harness = false
 name = "parse"
 
 [dependencies]
-lazy_static = "1.0.1"
+lazy_static = "1.2.0"
 
 [dev-dependencies]
-criterion = "0.2.4"
+criterion = "0.2.5"
