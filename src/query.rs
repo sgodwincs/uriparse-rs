@@ -10,11 +10,8 @@ use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
-use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::str;
-
-use crate::utility::{percent_encoded_equality, percent_encoded_hash};
 
 /// A map of byte characters that determines if a character is a valid query character.
 #[cfg_attr(rustfmt, rustfmt_skip)]
@@ -41,14 +38,8 @@ const QUERY_CHAR_MAP: [u8; 256] = [
 /// The query component as defined in
 /// [[RFC3986, Section 3.4](https://tools.ietf.org/html/rfc3986#section-3.4)].
 ///
-/// The query is case-sensitive. Furthermore, percent-encoding plays no role in equality checking
-/// meaning that `"query"` and `"que%72y"` are the same query. Both of these attributes are
-/// reflected in the equality and hash functions.
-///
-/// However, be aware that just because percent-encoding plays no role in equality checking does not
-/// mean that the query is normalized. The original query string will always be preserved as is with
-/// no normalization performed.
-#[derive(Clone, Debug)]
+/// The query is case-sensitive and no normalization is performed unless explicitly requested.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Query<'query>(Cow<'query, str>);
 
 impl<'query> Query<'query> {
@@ -109,74 +100,57 @@ impl<'query> Display for Query<'query> {
     }
 }
 
-impl<'query> Eq for Query<'query> {}
-
 impl<'query> From<Query<'query>> for String {
     fn from(value: Query<'query>) -> Self {
         value.to_string()
     }
 }
 
-impl<'query> Hash for Query<'query> {
-    fn hash<H>(&self, state: &mut H)
-    where
-        H: Hasher,
-    {
-        percent_encoded_hash(self.0.as_bytes(), state, true);
-    }
-}
-
-impl<'query> PartialEq for Query<'query> {
-    fn eq(&self, other: &Query) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other.0.as_bytes(), true)
-    }
-}
-
 impl<'query> PartialEq<[u8]> for Query<'query> {
     fn eq(&self, other: &[u8]) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other, true)
+        self.0.as_bytes() == other
     }
 }
 
 impl<'query> PartialEq<Query<'query>> for [u8] {
     fn eq(&self, other: &Query<'query>) -> bool {
-        percent_encoded_equality(self, other.0.as_bytes(), true)
+        self == other.0.as_bytes()
     }
 }
 
 impl<'a, 'query> PartialEq<&'a [u8]> for Query<'query> {
     fn eq(&self, other: &&'a [u8]) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other, true)
+        &self.0.as_bytes() == other
     }
 }
 
 impl<'a, 'query> PartialEq<Query<'query>> for &'a [u8] {
     fn eq(&self, other: &Query<'query>) -> bool {
-        percent_encoded_equality(self, other.0.as_bytes(), true)
+        self == &other.0.as_bytes()
     }
 }
 
 impl<'query> PartialEq<str> for Query<'query> {
     fn eq(&self, other: &str) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), true)
+        self.0.as_bytes() == other.as_bytes()
     }
 }
 
 impl<'query> PartialEq<Query<'query>> for str {
     fn eq(&self, other: &Query<'query>) -> bool {
-        percent_encoded_equality(self.as_bytes(), other.0.as_bytes(), true)
+        self.as_bytes() == other.0.as_bytes()
     }
 }
 
 impl<'a, 'query> PartialEq<&'a str> for Query<'query> {
     fn eq(&self, other: &&'a str) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), true)
+        self.0.as_bytes() == other.as_bytes()
     }
 }
 
 impl<'a, 'query> PartialEq<Query<'query>> for &'a str {
     fn eq(&self, other: &Query<'query>) -> bool {
-        percent_encoded_equality(self.as_bytes(), other.0.as_bytes(), true)
+        self.as_bytes() == other.0.as_bytes()
     }
 }
 

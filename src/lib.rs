@@ -2,8 +2,6 @@
 #![feature(try_from)]
 #![feature(never_type)]
 
-mod utility;
-
 pub mod authority;
 pub mod fragment;
 pub mod path;
