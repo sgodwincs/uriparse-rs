@@ -281,7 +281,7 @@ impl<'path> Path<'path> {
     }
 }
 
-impl<'path> Display for Path<'path> {
+impl Display for Path<'_> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         if self.absolute {
             formatter.write_char('/')?;
@@ -305,7 +305,7 @@ impl<'path> From<Path<'path>> for String {
     }
 }
 
-impl<'path> PartialEq<[u8]> for Path<'path> {
+impl PartialEq<[u8]> for Path<'_> {
     fn eq(&self, mut other: &[u8]) -> bool {
         if self.absolute {
             match other.get(0) {
@@ -353,7 +353,7 @@ impl<'path> PartialEq<Path<'path>> for [u8] {
     }
 }
 
-impl<'a, 'path> PartialEq<&'a [u8]> for Path<'path> {
+impl<'a> PartialEq<&'a [u8]> for Path<'_> {
     fn eq(&self, other: &&'a [u8]) -> bool {
         self == *other
     }
@@ -365,7 +365,7 @@ impl<'a, 'path> PartialEq<Path<'path>> for &'a [u8] {
     }
 }
 
-impl<'path> PartialEq<str> for Path<'path> {
+impl PartialEq<str> for Path<'_> {
     fn eq(&self, other: &str) -> bool {
         self == other.as_bytes()
     }
@@ -377,7 +377,7 @@ impl<'path> PartialEq<Path<'path>> for str {
     }
 }
 
-impl<'a, 'path> PartialEq<&'a str> for Path<'path> {
+impl<'a> PartialEq<&'a str> for Path<'_> {
     fn eq(&self, other: &&'a str) -> bool {
         self == other.as_bytes()
     }

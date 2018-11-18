@@ -785,7 +785,7 @@ impl<'uri> URI<'uri> {
     }
 }
 
-impl<'uri> Display for URI<'uri> {
+impl Display for URI<'_> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         self.uri_reference.fmt(formatter)
     }

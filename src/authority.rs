@@ -616,7 +616,7 @@ impl<'authority> Authority<'authority> {
     }
 }
 
-impl<'authority> Display for Authority<'authority> {
+impl Display for Authority<'_> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         if let Some(ref username) = self.username {
             username.fmt(formatter)?;
@@ -923,19 +923,19 @@ impl<'password> Password<'password> {
     }
 }
 
-impl<'password> AsRef<[u8]> for Password<'password> {
+impl AsRef<[u8]> for Password<'_> {
     fn as_ref(&self) -> &[u8] {
         self.0.as_bytes()
     }
 }
 
-impl<'password> AsRef<str> for Password<'password> {
+impl AsRef<str> for Password<'_> {
     fn as_ref(&self) -> &str {
         &self.0
     }
 }
 
-impl<'password> Deref for Password<'password> {
+impl Deref for Password<'_> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
@@ -943,7 +943,7 @@ impl<'password> Deref for Password<'password> {
     }
 }
 
-impl<'password> Display for Password<'password> {
+impl Display for Password<'_> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         formatter.write_str(&self.0)
     }
@@ -955,7 +955,7 @@ impl<'password> From<Password<'password>> for String {
     }
 }
 
-impl<'password> PartialEq<[u8]> for Password<'password> {
+impl PartialEq<[u8]> for Password<'_> {
     fn eq(&self, other: &[u8]) -> bool {
         self.0.as_bytes() == other
     }
@@ -967,7 +967,7 @@ impl<'password> PartialEq<Password<'password>> for [u8] {
     }
 }
 
-impl<'a, 'password> PartialEq<&'a [u8]> for Password<'password> {
+impl<'a> PartialEq<&'a [u8]> for Password<'_> {
     fn eq(&self, other: &&'a [u8]) -> bool {
         &self.0.as_bytes() == other
     }
@@ -979,7 +979,7 @@ impl<'a, 'password> PartialEq<Password<'password>> for &'a [u8] {
     }
 }
 
-impl<'password> PartialEq<str> for Password<'password> {
+impl PartialEq<str> for Password<'_> {
     fn eq(&self, other: &str) -> bool {
         self.0.as_bytes() == other.as_bytes()
     }
@@ -991,7 +991,7 @@ impl<'password> PartialEq<Password<'password>> for str {
     }
 }
 
-impl<'a, 'password> PartialEq<&'a str> for Password<'password> {
+impl<'a> PartialEq<&'a str> for Password<'_> {
     fn eq(&self, other: &&'a str) -> bool {
         self.0.as_bytes() == other.as_bytes()
     }
@@ -1028,7 +1028,7 @@ impl<'password> TryFrom<&'password str> for Password<'password> {
 #[derive(Clone, Debug)]
 pub struct RegisteredName<'name>(Cow<'name, str>);
 
-impl<'name> RegisteredName<'name> {
+impl RegisteredName<'_> {
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -1038,25 +1038,25 @@ impl<'name> RegisteredName<'name> {
     }
 }
 
-impl<'name> AsRef<[u8]> for RegisteredName<'name> {
+impl AsRef<[u8]> for RegisteredName<'_> {
     fn as_ref(&self) -> &[u8] {
         self.0.as_bytes()
     }
 }
 
-impl<'name> AsRef<str> for RegisteredName<'name> {
+impl AsRef<str> for RegisteredName<'_> {
     fn as_ref(&self) -> &str {
         &self.0
     }
 }
 
-impl<'name> Display for RegisteredName<'name> {
+impl Display for RegisteredName<'_> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         formatter.write_str(&self.0)
     }
 }
 
-impl<'name> Eq for RegisteredName<'name> {}
+impl Eq for RegisteredName<'_> {}
 
 impl<'name> From<RegisteredName<'name>> for String {
     fn from(value: RegisteredName<'name>) -> String {
@@ -1064,7 +1064,7 @@ impl<'name> From<RegisteredName<'name>> for String {
     }
 }
 
-impl<'name> Hash for RegisteredName<'name> {
+impl Hash for RegisteredName<'_> {
     fn hash<H>(&self, state: &mut H)
     where
         H: Hasher,
@@ -1077,13 +1077,13 @@ impl<'name> Hash for RegisteredName<'name> {
     }
 }
 
-impl<'name> PartialEq for RegisteredName<'name> {
+impl PartialEq for RegisteredName<'_> {
     fn eq(&self, other: &RegisteredName) -> bool {
         self.0.as_bytes().eq_ignore_ascii_case(other.0.as_bytes())
     }
 }
 
-impl<'name> PartialEq<[u8]> for RegisteredName<'name> {
+impl PartialEq<[u8]> for RegisteredName<'_> {
     fn eq(&self, other: &[u8]) -> bool {
         self.0.as_bytes().eq_ignore_ascii_case(other)
     }
@@ -1095,7 +1095,7 @@ impl<'name> PartialEq<RegisteredName<'name>> for [u8] {
     }
 }
 
-impl<'a, 'name> PartialEq<&'a [u8]> for RegisteredName<'name> {
+impl<'a> PartialEq<&'a [u8]> for RegisteredName<'_> {
     fn eq(&self, other: &&'a [u8]) -> bool {
         self.0.as_bytes().eq_ignore_ascii_case(other)
     }
@@ -1107,7 +1107,7 @@ impl<'a, 'name> PartialEq<RegisteredName<'name>> for &'a [u8] {
     }
 }
 
-impl<'name> PartialEq<str> for RegisteredName<'name> {
+impl PartialEq<str> for RegisteredName<'_> {
     fn eq(&self, other: &str) -> bool {
         self.0.as_bytes().eq_ignore_ascii_case(other.as_bytes())
     }
@@ -1119,7 +1119,7 @@ impl<'name> PartialEq<RegisteredName<'name>> for str {
     }
 }
 
-impl<'a, 'name> PartialEq<&'a str> for RegisteredName<'name> {
+impl<'a> PartialEq<&'a str> for RegisteredName<'_> {
     fn eq(&self, other: &&'a str) -> bool {
         self.0.as_bytes().eq_ignore_ascii_case(other.as_bytes())
     }
@@ -1157,7 +1157,7 @@ impl<'name> TryFrom<&'name str> for RegisteredName<'name> {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Username<'username>(Cow<'username, str>);
 
-impl<'username> Username<'username> {
+impl Username<'_> {
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -1167,19 +1167,19 @@ impl<'username> Username<'username> {
     }
 }
 
-impl<'username> AsRef<[u8]> for Username<'username> {
+impl AsRef<[u8]> for Username<'_> {
     fn as_ref(&self) -> &[u8] {
         self.0.as_bytes()
     }
 }
 
-impl<'username> AsRef<str> for Username<'username> {
+impl AsRef<str> for Username<'_> {
     fn as_ref(&self) -> &str {
         &self.0
     }
 }
 
-impl<'username> Deref for Username<'username> {
+impl Deref for Username<'_> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
@@ -1187,7 +1187,7 @@ impl<'username> Deref for Username<'username> {
     }
 }
 
-impl<'username> Display for Username<'username> {
+impl Display for Username<'_> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         formatter.write_str(&self.0)
     }
@@ -1199,7 +1199,7 @@ impl<'username> From<Username<'username>> for String {
     }
 }
 
-impl<'username> PartialEq<[u8]> for Username<'username> {
+impl PartialEq<[u8]> for Username<'_> {
     fn eq(&self, other: &[u8]) -> bool {
         self.0.as_bytes() == other
     }
@@ -1211,7 +1211,7 @@ impl<'username> PartialEq<Username<'username>> for [u8] {
     }
 }
 
-impl<'a, 'username> PartialEq<&'a [u8]> for Username<'username> {
+impl<'a> PartialEq<&'a [u8]> for Username<'_> {
     fn eq(&self, other: &&'a [u8]) -> bool {
         &self.0.as_bytes() == other
     }
@@ -1223,7 +1223,7 @@ impl<'a, 'username> PartialEq<Username<'username>> for &'a [u8] {
     }
 }
 
-impl<'username> PartialEq<str> for Username<'username> {
+impl PartialEq<str> for Username<'_> {
     fn eq(&self, other: &str) -> bool {
         self.0.as_bytes() == other.as_bytes()
     }
@@ -1235,7 +1235,7 @@ impl<'username> PartialEq<Username<'username>> for str {
     }
 }
 
-impl<'a, 'username> PartialEq<&'a str> for Username<'username> {
+impl<'a> PartialEq<&'a str> for Username<'_> {
     fn eq(&self, other: &&'a str) -> bool {
         self.0.as_bytes() == other.as_bytes()
     }

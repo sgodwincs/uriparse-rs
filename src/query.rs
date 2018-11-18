@@ -74,19 +74,19 @@ impl<'query> Query<'query> {
     }
 }
 
-impl<'query> AsRef<[u8]> for Query<'query> {
+impl AsRef<[u8]> for Query<'_> {
     fn as_ref(&self) -> &[u8] {
         self.0.as_bytes()
     }
 }
 
-impl<'query> AsRef<str> for Query<'query> {
+impl AsRef<str> for Query<'_> {
     fn as_ref(&self) -> &str {
         &self.0
     }
 }
 
-impl<'query> Deref for Query<'query> {
+impl Deref for Query<'_> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
@@ -94,7 +94,7 @@ impl<'query> Deref for Query<'query> {
     }
 }
 
-impl<'query> Display for Query<'query> {
+impl Display for Query<'_> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         formatter.write_str(&self.0)
     }
@@ -106,7 +106,7 @@ impl<'query> From<Query<'query>> for String {
     }
 }
 
-impl<'query> PartialEq<[u8]> for Query<'query> {
+impl PartialEq<[u8]> for Query<'_> {
     fn eq(&self, other: &[u8]) -> bool {
         self.0.as_bytes() == other
     }
@@ -118,7 +118,7 @@ impl<'query> PartialEq<Query<'query>> for [u8] {
     }
 }
 
-impl<'a, 'query> PartialEq<&'a [u8]> for Query<'query> {
+impl<'a> PartialEq<&'a [u8]> for Query<'_> {
     fn eq(&self, other: &&'a [u8]) -> bool {
         &self.0.as_bytes() == other
     }
@@ -130,7 +130,7 @@ impl<'a, 'query> PartialEq<Query<'query>> for &'a [u8] {
     }
 }
 
-impl<'query> PartialEq<str> for Query<'query> {
+impl PartialEq<str> for Query<'_> {
     fn eq(&self, other: &str) -> bool {
         self.0.as_bytes() == other.as_bytes()
     }
@@ -142,7 +142,7 @@ impl<'query> PartialEq<Query<'query>> for str {
     }
 }
 
-impl<'a, 'query> PartialEq<&'a str> for Query<'query> {
+impl<'a> PartialEq<&'a str> for Query<'_> {
     fn eq(&self, other: &&'a str) -> bool {
         self.0.as_bytes() == other.as_bytes()
     }
