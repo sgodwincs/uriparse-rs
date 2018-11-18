@@ -1023,14 +1023,8 @@ impl<'password> TryFrom<&'password str> for Password<'password> {
 
 /// A host that is a registered name (i.e. not an IP literal).
 ///
-/// The host is case-insensitive meaning that `"example.com"` and `"ExAmPlE.CoM"` refer to the same
-/// host. Furthermore, percent-encoding plays no role in equality checking meaning that
-///`"example.com"` and `"exampl%65.com"` also refer to the same host. Both of these attributes are
-/// reflected in the equality and hash functions.
-///
-/// However, be aware that just because percent-encoding plays no role in equality checking does not
-/// mean that the host is normalized. The original host string will always be preserved as is with
-/// no normalization performed.
+/// The registered name is case-insensitive and no normalization is performed unless explicitly
+/// requested.
 #[derive(Clone, Debug)]
 pub struct RegisteredName<'name>(Cow<'name, str>);
 
