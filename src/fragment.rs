@@ -70,19 +70,19 @@ impl<'fragment> Fragment<'fragment> {
     }
 }
 
-impl AsRef<[u8]> for Fragment<'_> {
+impl<'fragment> AsRef<[u8]> for Fragment<'fragment> {
     fn as_ref(&self) -> &[u8] {
         self.0.as_bytes()
     }
 }
 
-impl AsRef<str> for Fragment<'_> {
+impl<'fragment> AsRef<str> for Fragment<'fragment> {
     fn as_ref(&self) -> &str {
         &self.0
     }
 }
 
-impl Deref for Fragment<'_> {
+impl<'fragment> Deref for Fragment<'fragment> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
@@ -90,7 +90,7 @@ impl Deref for Fragment<'_> {
     }
 }
 
-impl Display for Fragment<'_> {
+impl<'fragment> Display for Fragment<'fragment> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         formatter.write_str(&self.0)
     }
@@ -102,7 +102,7 @@ impl<'fragment> From<Fragment<'fragment>> for String {
     }
 }
 
-impl PartialEq<[u8]> for Fragment<'_> {
+impl<'fragment> PartialEq<[u8]> for Fragment<'fragment> {
     fn eq(&self, other: &[u8]) -> bool {
         self.0.as_bytes() == other
     }
@@ -114,7 +114,7 @@ impl<'fragment> PartialEq<Fragment<'fragment>> for [u8] {
     }
 }
 
-impl<'a> PartialEq<&'a [u8]> for Fragment<'_> {
+impl<'a, 'fragment> PartialEq<&'a [u8]> for Fragment<'fragment> {
     fn eq(&self, other: &&'a [u8]) -> bool {
         &self.0.as_bytes() == other
     }
@@ -126,7 +126,7 @@ impl<'a, 'fragment> PartialEq<Fragment<'fragment>> for &'a [u8] {
     }
 }
 
-impl PartialEq<str> for Fragment<'_> {
+impl<'fragment> PartialEq<str> for Fragment<'fragment> {
     fn eq(&self, other: &str) -> bool {
         self.0.as_bytes() == other.as_bytes()
     }
@@ -138,7 +138,7 @@ impl<'fragment> PartialEq<Fragment<'fragment>> for str {
     }
 }
 
-impl<'a> PartialEq<&'a str> for Fragment<'_> {
+impl<'a, 'fragment> PartialEq<&'a str> for Fragment<'fragment> {
     fn eq(&self, other: &&'a str) -> bool {
         self.0.as_bytes() == other.as_bytes()
     }

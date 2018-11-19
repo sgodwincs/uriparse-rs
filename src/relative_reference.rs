@@ -710,7 +710,7 @@ impl<'uri> RelativeReference<'uri> {
     }
 }
 
-impl Display for RelativeReference<'_> {
+impl<'uri> Display for RelativeReference<'uri> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         self.uri_reference.fmt(formatter)
     }
