@@ -6,8 +6,11 @@ use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
+use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::str;
+
+use crate::utility::{percent_encoded_equality, percent_encoded_hash};
 
 /// A map of byte characters that determines if a character is a valid fragment character.
 #[cfg_attr(rustfmt, rustfmt_skip)]
@@ -34,8 +37,14 @@ const FRAGMENT_CHAR_MAP: [u8; 256] = [
 /// The fragment component as defined in
 /// [[RFC3986, Section 3.5](https://tools.ietf.org/html/rfc3986#section-3.5)].
 ///
-/// The fragment is case-sensitive and no normalization is performed unless explicitly requested.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+/// The fragment is case-sensitive. Furthermore, percent-encoding plays no role in equality checking
+/// meaning that `"fragment"` and `"fr%61gment"` are the same fragment. Both of these attributes are
+/// reflected in the equality and hash functions.
+///
+/// However, be aware that just because percent-encoding plays no role in equality checking does not
+/// mean that the fragment is normalized. The original fragment string will always be preserved as
+/// is with no normalization performed.
+#[derive(Clone, Debug)]
 pub struct Fragment<'fragment>(Cow<'fragment, str>);
 
 impl<'fragment> Fragment<'fragment> {
@@ -96,57 +105,74 @@ impl<'fragment> Display for Fragment<'fragment> {
     }
 }
 
+impl<'fragment> Eq for Fragment<'fragment> {}
+
 impl<'fragment> From<Fragment<'fragment>> for String {
     fn from(value: Fragment<'fragment>) -> Self {
         value.to_string()
     }
 }
 
+impl<'fragment> Hash for Fragment<'fragment> {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
+        percent_encoded_hash(self.0.as_bytes(), state, true);
+    }
+}
+
+impl<'fragment> PartialEq for Fragment<'fragment> {
+    fn eq(&self, other: &Fragment) -> bool {
+        percent_encoded_equality(self.0.as_bytes(), other.0.as_bytes(), true)
+    }
+}
+
 impl<'fragment> PartialEq<[u8]> for Fragment<'fragment> {
     fn eq(&self, other: &[u8]) -> bool {
-        self.0.as_bytes() == other
+        percent_encoded_equality(self.0.as_bytes(), other, true)
     }
 }
 
 impl<'fragment> PartialEq<Fragment<'fragment>> for [u8] {
     fn eq(&self, other: &Fragment<'fragment>) -> bool {
-        self == other.0.as_bytes()
+        percent_encoded_equality(self, other.0.as_bytes(), true)
     }
 }
 
 impl<'a, 'fragment> PartialEq<&'a [u8]> for Fragment<'fragment> {
     fn eq(&self, other: &&'a [u8]) -> bool {
-        &self.0.as_bytes() == other
+        percent_encoded_equality(self.0.as_bytes(), other, true)
     }
 }
 
 impl<'a, 'fragment> PartialEq<Fragment<'fragment>> for &'a [u8] {
     fn eq(&self, other: &Fragment<'fragment>) -> bool {
-        self == &other.0.as_bytes()
+        percent_encoded_equality(self, other.0.as_bytes(), true)
     }
 }
 
 impl<'fragment> PartialEq<str> for Fragment<'fragment> {
     fn eq(&self, other: &str) -> bool {
-        self.0.as_bytes() == other.as_bytes()
+        percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), true)
     }
 }
 
 impl<'fragment> PartialEq<Fragment<'fragment>> for str {
     fn eq(&self, other: &Fragment<'fragment>) -> bool {
-        self.as_bytes() == other.0.as_bytes()
+        percent_encoded_equality(self.as_bytes(), other.0.as_bytes(), true)
     }
 }
 
 impl<'a, 'fragment> PartialEq<&'a str> for Fragment<'fragment> {
     fn eq(&self, other: &&'a str) -> bool {
-        self.0.as_bytes() == other.as_bytes()
+        percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), true)
     }
 }
 
 impl<'a, 'fragment> PartialEq<Fragment<'fragment>> for &'a str {
     fn eq(&self, other: &Fragment<'fragment>) -> bool {
-        self.as_bytes() == other.0.as_bytes()
+        percent_encoded_equality(self.as_bytes(), other.0.as_bytes(), true)
     }
 }
 
