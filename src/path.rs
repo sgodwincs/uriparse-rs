@@ -284,7 +284,7 @@ impl<'path> Path<'path> {
     }
 }
 
-impl<'path> Display for Path<'path> {
+impl Display for Path<'_> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         if self.absolute {
             formatter.write_char('/')?;
@@ -308,7 +308,7 @@ impl<'path> From<Path<'path>> for String {
     }
 }
 
-impl<'path> PartialEq<[u8]> for Path<'path> {
+impl PartialEq<[u8]> for Path<'_> {
     fn eq(&self, mut other: &[u8]) -> bool {
         if self.absolute {
             match other.get(0) {
@@ -356,7 +356,7 @@ impl<'path> PartialEq<Path<'path>> for [u8] {
     }
 }
 
-impl<'a, 'path> PartialEq<&'a [u8]> for Path<'path> {
+impl<'a> PartialEq<&'a [u8]> for Path<'_> {
     fn eq(&self, other: &&'a [u8]) -> bool {
         self == *other
     }
@@ -368,7 +368,7 @@ impl<'a, 'path> PartialEq<Path<'path>> for &'a [u8] {
     }
 }
 
-impl<'path> PartialEq<str> for Path<'path> {
+impl PartialEq<str> for Path<'_> {
     fn eq(&self, other: &str) -> bool {
         self == other.as_bytes()
     }
@@ -380,7 +380,7 @@ impl<'path> PartialEq<Path<'path>> for str {
     }
 }
 
-impl<'a, 'path> PartialEq<&'a str> for Path<'path> {
+impl<'a> PartialEq<&'a str> for Path<'_> {
     fn eq(&self, other: &&'a str) -> bool {
         self == other.as_bytes()
     }
@@ -420,7 +420,7 @@ impl<'path> TryFrom<&'path str> for Path<'path> {
 #[derive(Clone, Debug)]
 pub struct Segment<'segment>(Cow<'segment, str>);
 
-impl<'segment> Segment<'segment> {
+impl Segment<'_> {
     /// Returns a `str` representation of the segment.
     ///
     /// # Examples
@@ -465,19 +465,19 @@ impl<'segment> Segment<'segment> {
     }
 }
 
-impl<'segment> AsRef<[u8]> for Segment<'segment> {
+impl AsRef<[u8]> for Segment<'_> {
     fn as_ref(&self) -> &[u8] {
         self.0.as_bytes()
     }
 }
 
-impl<'segment> AsRef<str> for Segment<'segment> {
+impl AsRef<str> for Segment<'_> {
     fn as_ref(&self) -> &str {
         &self.0
     }
 }
 
-impl<'segment> Deref for Segment<'segment> {
+impl Deref for Segment<'_> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
@@ -485,13 +485,13 @@ impl<'segment> Deref for Segment<'segment> {
     }
 }
 
-impl<'segment> Display for Segment<'segment> {
+impl Display for Segment<'_> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         formatter.write_str(&self.0)
     }
 }
 
-impl<'segment> Eq for Segment<'segment> {}
+impl Eq for Segment<'_> {}
 
 impl<'segment> From<Segment<'segment>> for String {
     fn from(value: Segment<'segment>) -> Self {
@@ -499,7 +499,7 @@ impl<'segment> From<Segment<'segment>> for String {
     }
 }
 
-impl<'segment> Hash for Segment<'segment> {
+impl Hash for Segment<'_> {
     fn hash<H>(&self, state: &mut H)
     where
         H: Hasher,
@@ -508,13 +508,13 @@ impl<'segment> Hash for Segment<'segment> {
     }
 }
 
-impl<'segment> PartialEq for Segment<'segment> {
+impl PartialEq for Segment<'_> {
     fn eq(&self, other: &Segment) -> bool {
         percent_encoded_equality(self.0.as_bytes(), other.0.as_bytes(), true)
     }
 }
 
-impl<'segment> PartialEq<[u8]> for Segment<'segment> {
+impl PartialEq<[u8]> for Segment<'_> {
     fn eq(&self, other: &[u8]) -> bool {
         percent_encoded_equality(self.0.as_bytes(), other, true)
     }
@@ -526,7 +526,7 @@ impl<'segment> PartialEq<Segment<'segment>> for [u8] {
     }
 }
 
-impl<'a, 'segment> PartialEq<&'a [u8]> for Segment<'segment> {
+impl<'a> PartialEq<&'a [u8]> for Segment<'_> {
     fn eq(&self, other: &&'a [u8]) -> bool {
         percent_encoded_equality(self.0.as_bytes(), other, true)
     }
@@ -538,7 +538,7 @@ impl<'a, 'segment> PartialEq<Segment<'segment>> for &'a [u8] {
     }
 }
 
-impl<'segment> PartialEq<str> for Segment<'segment> {
+impl PartialEq<str> for Segment<'_> {
     fn eq(&self, other: &str) -> bool {
         percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), true)
     }
@@ -550,7 +550,7 @@ impl<'segment> PartialEq<Segment<'segment>> for str {
     }
 }
 
-impl<'a, 'segment> PartialEq<&'a str> for Segment<'segment> {
+impl<'a> PartialEq<&'a str> for Segment<'_> {
     fn eq(&self, other: &&'a str) -> bool {
         percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), true)
     }

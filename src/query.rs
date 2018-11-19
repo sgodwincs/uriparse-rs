@@ -51,7 +51,7 @@ const QUERY_CHAR_MAP: [u8; 256] = [
 #[derive(Clone, Debug)]
 pub struct Query<'query>(Cow<'query, str>);
 
-impl<'query> Query<'query> {
+impl Query<'_> {
     /// Returns a `str` representation of the query.
     ///
     /// # Examples
@@ -83,19 +83,19 @@ impl<'query> Query<'query> {
     }
 }
 
-impl<'query> AsRef<[u8]> for Query<'query> {
+impl AsRef<[u8]> for Query<'_> {
     fn as_ref(&self) -> &[u8] {
         self.0.as_bytes()
     }
 }
 
-impl<'query> AsRef<str> for Query<'query> {
+impl AsRef<str> for Query<'_> {
     fn as_ref(&self) -> &str {
         &self.0
     }
 }
 
-impl<'query> Deref for Query<'query> {
+impl Deref for Query<'_> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
@@ -103,13 +103,13 @@ impl<'query> Deref for Query<'query> {
     }
 }
 
-impl<'query> Display for Query<'query> {
+impl Display for Query<'_> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         formatter.write_str(&self.0)
     }
 }
 
-impl<'query> Eq for Query<'query> {}
+impl Eq for Query<'_> {}
 
 impl<'query> From<Query<'query>> for String {
     fn from(value: Query<'query>) -> Self {
@@ -117,7 +117,7 @@ impl<'query> From<Query<'query>> for String {
     }
 }
 
-impl<'query> Hash for Query<'query> {
+impl Hash for Query<'_> {
     fn hash<H>(&self, state: &mut H)
     where
         H: Hasher,
@@ -126,13 +126,13 @@ impl<'query> Hash for Query<'query> {
     }
 }
 
-impl<'query> PartialEq for Query<'query> {
+impl PartialEq for Query<'_> {
     fn eq(&self, other: &Query) -> bool {
         percent_encoded_equality(self.0.as_bytes(), other.0.as_bytes(), true)
     }
 }
 
-impl<'query> PartialEq<[u8]> for Query<'query> {
+impl PartialEq<[u8]> for Query<'_> {
     fn eq(&self, other: &[u8]) -> bool {
         percent_encoded_equality(self.0.as_bytes(), other, true)
     }
@@ -144,7 +144,7 @@ impl<'query> PartialEq<Query<'query>> for [u8] {
     }
 }
 
-impl<'a, 'query> PartialEq<&'a [u8]> for Query<'query> {
+impl<'a> PartialEq<&'a [u8]> for Query<'_> {
     fn eq(&self, other: &&'a [u8]) -> bool {
         percent_encoded_equality(self.0.as_bytes(), other, true)
     }
@@ -156,7 +156,7 @@ impl<'a, 'query> PartialEq<Query<'query>> for &'a [u8] {
     }
 }
 
-impl<'query> PartialEq<str> for Query<'query> {
+impl PartialEq<str> for Query<'_> {
     fn eq(&self, other: &str) -> bool {
         percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), true)
     }
@@ -168,7 +168,7 @@ impl<'query> PartialEq<Query<'query>> for str {
     }
 }
 
-impl<'a, 'query> PartialEq<&'a str> for Query<'query> {
+impl<'a> PartialEq<&'a str> for Query<'_> {
     fn eq(&self, other: &&'a str) -> bool {
         percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), true)
     }

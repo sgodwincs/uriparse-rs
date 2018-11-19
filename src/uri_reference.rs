@@ -1001,7 +1001,7 @@ impl<'uri> URIReference<'uri> {
     }
 }
 
-impl<'uri> Display for URIReference<'uri> {
+impl Display for URIReference<'_> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         if let Some(ref scheme) = self.scheme {
             formatter.write_str(scheme.as_str())?;

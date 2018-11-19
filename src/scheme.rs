@@ -205,19 +205,19 @@ macro_rules! schemes {
     }
 }
 
-impl<'scheme> AsRef<[u8]> for Scheme<'scheme> {
+impl AsRef<[u8]> for Scheme<'_> {
     fn as_ref(&self) -> &[u8] {
         self.as_str().as_bytes()
     }
 }
 
-impl<'scheme> AsRef<str> for Scheme<'scheme> {
+impl AsRef<str> for Scheme<'_> {
     fn as_ref(&self) -> &str {
         self.as_str()
     }
 }
 
-impl<'scheme> Display for Scheme<'scheme> {
+impl Display for Scheme<'_> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         formatter.write_str(self.as_str())
     }
@@ -229,7 +229,7 @@ impl<'scheme> From<Scheme<'scheme>> for String {
     }
 }
 
-impl<'scheme> PartialEq<str> for Scheme<'scheme> {
+impl PartialEq<str> for Scheme<'_> {
     fn eq(&self, other: &str) -> bool {
         self.as_str().eq_ignore_ascii_case(other)
     }
@@ -241,7 +241,7 @@ impl<'scheme> PartialEq<Scheme<'scheme>> for str {
     }
 }
 
-impl<'a, 'scheme> PartialEq<&'a str> for Scheme<'scheme> {
+impl<'a> PartialEq<&'a str> for Scheme<'_> {
     fn eq(&self, other: &&'a str) -> bool {
         self.as_str().eq_ignore_ascii_case(other)
     }
@@ -282,7 +282,7 @@ impl<'scheme> TryFrom<&'scheme str> for Scheme<'scheme> {
 #[derive(Clone, Debug)]
 pub struct UnregisteredScheme<'scheme>(Cow<'scheme, str>);
 
-impl<'scheme> UnregisteredScheme<'scheme> {
+impl UnregisteredScheme<'_> {
     /// Returns a `str` representation of the scheme.
     ///
     /// The case-sensitivity of the original string is preserved.
@@ -316,25 +316,25 @@ impl<'scheme> UnregisteredScheme<'scheme> {
     }
 }
 
-impl<'scheme> AsRef<[u8]> for UnregisteredScheme<'scheme> {
+impl AsRef<[u8]> for UnregisteredScheme<'_> {
     fn as_ref(&self) -> &[u8] {
         self.0.as_bytes()
     }
 }
 
-impl<'scheme> AsRef<str> for UnregisteredScheme<'scheme> {
+impl AsRef<str> for UnregisteredScheme<'_> {
     fn as_ref(&self) -> &str {
         &self.0
     }
 }
 
-impl<'scheme> Display for UnregisteredScheme<'scheme> {
+impl Display for UnregisteredScheme<'_> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         formatter.write_str(&self.0)
     }
 }
 
-impl<'scheme> Eq for UnregisteredScheme<'scheme> {}
+impl Eq for UnregisteredScheme<'_> {}
 
 impl<'scheme> From<UnregisteredScheme<'scheme>> for String {
     fn from(value: UnregisteredScheme<'scheme>) -> Self {
@@ -342,7 +342,7 @@ impl<'scheme> From<UnregisteredScheme<'scheme>> for String {
     }
 }
 
-impl<'scheme> Hash for UnregisteredScheme<'scheme> {
+impl Hash for UnregisteredScheme<'_> {
     fn hash<H>(&self, state: &mut H)
     where
         H: Hasher,
@@ -351,13 +351,13 @@ impl<'scheme> Hash for UnregisteredScheme<'scheme> {
     }
 }
 
-impl<'scheme> PartialEq for UnregisteredScheme<'scheme> {
+impl PartialEq for UnregisteredScheme<'_> {
     fn eq(&self, other: &UnregisteredScheme) -> bool {
         self.0.eq_ignore_ascii_case(&other.0)
     }
 }
 
-impl<'scheme> PartialEq<str> for UnregisteredScheme<'scheme> {
+impl PartialEq<str> for UnregisteredScheme<'_> {
     fn eq(&self, other: &str) -> bool {
         self.0.eq_ignore_ascii_case(other)
     }
@@ -369,7 +369,7 @@ impl<'scheme> PartialEq<UnregisteredScheme<'scheme>> for str {
     }
 }
 
-impl<'a, 'scheme> PartialEq<&'a str> for UnregisteredScheme<'scheme> {
+impl<'a> PartialEq<&'a str> for UnregisteredScheme<'_> {
     fn eq(&self, other: &&'a str) -> bool {
         self.0.eq_ignore_ascii_case(other)
     }
