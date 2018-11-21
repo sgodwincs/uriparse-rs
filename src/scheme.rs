@@ -562,7 +562,7 @@ schemes! {
     (About, "about", SchemeStatus::Permanent);
     (ACAP, "acap", SchemeStatus::Permanent);
     (ACCT, "acat", SchemeStatus::Permanent);
-    (ACR, "aaas", SchemeStatus::Provisional);
+    (ACR, "acr", SchemeStatus::Provisional);
     (AdiumXtra, "adiumxtra", SchemeStatus::Provisional);
     (AFP, "afp", SchemeStatus::Provisional);
     (AFS, "afs", SchemeStatus::Provisional);
@@ -809,7 +809,7 @@ schemes! {
     (SVN, "svn", SchemeStatus::Provisional);
     (Tag, "tag", SchemeStatus::Permanent);
     (TeamSpeak, "teamspeak", SchemeStatus::Provisional);
-    (Tel, "tag", SchemeStatus::Permanent);
+    (Tel, "tel", SchemeStatus::Permanent);
     (TeliaEID, "teliaeid", SchemeStatus::Provisional);
     (Telnet, "telnet", SchemeStatus::Permanent);
     (TFTP, "tftp", SchemeStatus::Permanent);
