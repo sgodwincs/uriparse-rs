@@ -10,7 +10,10 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::str;
 
-use crate::utility::{percent_encoded_equality, percent_encoded_hash};
+use crate::utility::{
+    get_percent_encoded_value, normalize_bytes, percent_encoded_equality, percent_encoded_hash,
+    UNRESERVED_CHAR_MAP,
+};
 
 /// A map of byte characters that determines if a character is a valid fragment character.
 #[cfg_attr(rustfmt, rustfmt_skip)]
@@ -45,7 +48,10 @@ const FRAGMENT_CHAR_MAP: [u8; 256] = [
 /// mean that the fragment is normalized. The original fragment string will always be preserved as
 /// is with no normalization performed.
 #[derive(Clone, Debug)]
-pub struct Fragment<'fragment>(Cow<'fragment, str>);
+pub struct Fragment<'fragment> {
+    fragment: Cow<'fragment, str>,
+    normalized: bool,
+}
 
 impl Fragment<'_> {
     /// Returns a `str` representation of the fragment.
@@ -63,7 +69,7 @@ impl Fragment<'_> {
     /// assert_eq!(fragment.as_str(), "fragment");
     /// ```
     pub fn as_str(&self) -> &str {
-        &self.0
+        &self.fragment
     }
 
     /// Converts the [`Fragment`] into an owned copy.
@@ -75,19 +81,33 @@ impl Fragment<'_> {
     /// This is different from just cloning. Cloning the fragment will just copy the references, and
     /// thus the lifetime will remain the same.
     pub fn into_owned(self) -> Fragment<'static> {
-        Fragment(Cow::from(self.0.into_owned()))
+        Fragment {
+            fragment: Cow::from(self.fragment.into_owned()),
+            normalized: self.normalized,
+        }
+    }
+
+    pub fn is_normalized(&self) -> bool {
+        self.normalized
+    }
+
+    pub fn normalize(&mut self) {
+        if !self.normalized {
+            let bytes = unsafe { self.fragment.to_mut().as_mut_vec() };
+            normalize_bytes(bytes);
+        }
     }
 }
 
 impl AsRef<[u8]> for Fragment<'_> {
     fn as_ref(&self) -> &[u8] {
-        self.0.as_bytes()
+        self.fragment.as_bytes()
     }
 }
 
 impl AsRef<str> for Fragment<'_> {
     fn as_ref(&self) -> &str {
-        &self.0
+        &self.fragment
     }
 }
 
@@ -95,13 +115,13 @@ impl Deref for Fragment<'_> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.fragment
     }
 }
 
 impl Display for Fragment<'_> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        formatter.write_str(&self.0)
+        formatter.write_str(&self.fragment)
     }
 }
 
@@ -118,61 +138,61 @@ impl Hash for Fragment<'_> {
     where
         H: Hasher,
     {
-        percent_encoded_hash(self.0.as_bytes(), state, true);
+        percent_encoded_hash(self.fragment.as_bytes(), state, true);
     }
 }
 
 impl PartialEq for Fragment<'_> {
     fn eq(&self, other: &Fragment) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other.0.as_bytes(), true)
+        percent_encoded_equality(self.fragment.as_bytes(), other.fragment.as_bytes(), true)
     }
 }
 
 impl PartialEq<[u8]> for Fragment<'_> {
     fn eq(&self, other: &[u8]) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other, true)
+        percent_encoded_equality(self.fragment.as_bytes(), other, true)
     }
 }
 
 impl<'fragment> PartialEq<Fragment<'fragment>> for [u8] {
     fn eq(&self, other: &Fragment<'fragment>) -> bool {
-        percent_encoded_equality(self, other.0.as_bytes(), true)
+        percent_encoded_equality(self, other.fragment.as_bytes(), true)
     }
 }
 
 impl<'a> PartialEq<&'a [u8]> for Fragment<'_> {
     fn eq(&self, other: &&'a [u8]) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other, true)
+        percent_encoded_equality(self.fragment.as_bytes(), other, true)
     }
 }
 
 impl<'a, 'fragment> PartialEq<Fragment<'fragment>> for &'a [u8] {
     fn eq(&self, other: &Fragment<'fragment>) -> bool {
-        percent_encoded_equality(self, other.0.as_bytes(), true)
+        percent_encoded_equality(self, other.fragment.as_bytes(), true)
     }
 }
 
 impl PartialEq<str> for Fragment<'_> {
     fn eq(&self, other: &str) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), true)
+        percent_encoded_equality(self.fragment.as_bytes(), other.as_bytes(), true)
     }
 }
 
 impl<'fragment> PartialEq<Fragment<'fragment>> for str {
     fn eq(&self, other: &Fragment<'fragment>) -> bool {
-        percent_encoded_equality(self.as_bytes(), other.0.as_bytes(), true)
+        percent_encoded_equality(self.as_bytes(), other.fragment.as_bytes(), true)
     }
 }
 
 impl<'a> PartialEq<&'a str> for Fragment<'_> {
     fn eq(&self, other: &&'a str) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), true)
+        percent_encoded_equality(self.fragment.as_bytes(), other.as_bytes(), true)
     }
 }
 
 impl<'a, 'fragment> PartialEq<Fragment<'fragment>> for &'a str {
     fn eq(&self, other: &Fragment<'fragment>) -> bool {
-        percent_encoded_equality(self.as_bytes(), other.0.as_bytes(), true)
+        percent_encoded_equality(self.as_bytes(), other.fragment.as_bytes(), true)
     }
 }
 
@@ -181,26 +201,31 @@ impl<'fragment> TryFrom<&'fragment [u8]> for Fragment<'fragment> {
 
     fn try_from(value: &'fragment [u8]) -> Result<Self, Self::Error> {
         let mut bytes = value.iter();
+        let mut normalized = true;
 
         while let Some(&byte) = bytes.next() {
             match FRAGMENT_CHAR_MAP[byte as usize] {
                 0 => return Err(InvalidFragment::InvalidCharacter),
-                b'%' => match (bytes.next(), bytes.next()) {
-                    (Some(byte_1), Some(byte_2))
-                        if byte_1.is_ascii_hexdigit() && byte_2.is_ascii_hexdigit() =>
-                    {
-                        ()
+                b'%' => {
+                    match get_percent_encoded_value(bytes.next().cloned(), bytes.next().cloned()) {
+                        Ok((hex_value, uppercase)) => {
+                            if !uppercase || UNRESERVED_CHAR_MAP[hex_value as usize] != 0 {
+                                normalized = false;
+                            }
+                        }
+                        Err(_) => return Err(InvalidFragment::InvalidPercentEncoding),
                     }
-                    _ => return Err(InvalidFragment::InvalidPercentEncoding),
-                },
+                }
                 _ => (),
             }
         }
 
         // Unsafe: The loop above makes sure this is safe.
 
-        let fragment = Fragment(Cow::from(unsafe { str::from_utf8_unchecked(value) }));
-        Ok(fragment)
+        Ok(Fragment {
+            fragment: Cow::from(unsafe { str::from_utf8_unchecked(value) }),
+            normalized,
+        })
     }
 }
 
