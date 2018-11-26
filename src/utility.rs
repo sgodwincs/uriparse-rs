@@ -46,6 +46,38 @@ fn hex_digit_to_decimal(digit: u8) -> Result<(u8, bool), ()> {
     }
 }
 
+pub fn normalize_bytes(bytes: &mut Vec<u8>) {
+    let mut read_index = 0;
+    let mut write_index = 0;
+
+    while read_index < bytes.len() {
+        let byte = bytes[read_index];
+        read_index += 1;
+
+        if byte == b'%' {
+            let first_digit = bytes.get(read_index).cloned();
+            let second_digit = bytes.get(read_index + 1).cloned();
+            let (hex_value, _) = get_percent_encoded_value(first_digit, second_digit).unwrap();
+            read_index += 2;
+
+            if UNRESERVED_CHAR_MAP[hex_value as usize] != 0 {
+                bytes[write_index] = hex_value;
+                write_index += 1;
+            } else {
+                bytes[write_index] = b'%';
+                bytes[write_index + 1] = first_digit.unwrap().to_ascii_uppercase();
+                bytes[write_index + 2] = second_digit.unwrap().to_ascii_uppercase();
+                write_index += 3;
+            }
+        } else {
+            bytes[write_index] = byte;
+            write_index += 1;
+        }
+    }
+
+    bytes.truncate(write_index);
+}
+
 pub fn percent_encoded_hash<H>(value: &[u8], state: &mut H, case_sensitive: bool)
 where
     H: Hasher,
