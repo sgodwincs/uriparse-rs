@@ -14,7 +14,9 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::str;
 
-use crate::utility::{percent_encoded_equality, percent_encoded_hash};
+use crate::utility::{
+    get_percent_encoded_value, percent_encoded_equality, percent_encoded_hash, UNRESERVED_CHAR_MAP,
+};
 
 /// A map of byte characters that determines if a character is a valid query character.
 #[cfg_attr(rustfmt, rustfmt_skip)]
@@ -49,7 +51,10 @@ const QUERY_CHAR_MAP: [u8; 256] = [
 /// mean that the query is normalized. The original query string will always be preserved as is with
 /// no normalization performed.
 #[derive(Clone, Debug)]
-pub struct Query<'query>(Cow<'query, str>);
+pub struct Query<'query> {
+    normalized: bool,
+    query: Cow<'query, str>,
+}
 
 impl Query<'_> {
     /// Returns a `str` representation of the query.
@@ -67,7 +72,7 @@ impl Query<'_> {
     /// assert_eq!(query.as_str(), "query");
     /// ```
     pub fn as_str(&self) -> &str {
-        &self.0
+        &self.query
     }
 
     /// Converts the [`Query`] into an owned copy.
@@ -79,19 +84,63 @@ impl Query<'_> {
     /// This is different from just cloning. Cloning the query will just copy the references, and
     /// thus the lifetime will remain the same.
     pub fn into_owned(self) -> Query<'static> {
-        Query(Cow::from(self.0.into_owned()))
+        Query {
+            normalized: self.normalized,
+            query: Cow::from(self.query.into_owned()),
+        }
+    }
+
+    pub fn is_normalized(&self) -> bool {
+        self.normalized
+    }
+
+    pub fn normalize(&mut self) {
+        if self.normalized {
+            return;
+        }
+
+        let bytes = unsafe { self.query.to_mut().as_mut_vec() };
+        let mut read_index = 0;
+        let mut write_index = 0;
+
+        while read_index < bytes.len() {
+            let byte = bytes[read_index];
+            read_index += 1;
+
+            if byte == b'%' {
+                let first_digit = bytes.get(read_index).cloned();
+                let second_digit = bytes.get(read_index + 1).cloned();
+                let (hex_value, _) = get_percent_encoded_value(first_digit, second_digit).unwrap();
+                read_index += 2;
+
+                if UNRESERVED_CHAR_MAP[hex_value as usize] != 0 {
+                    bytes[write_index] = hex_value;
+                    write_index += 1;
+                } else {
+                    bytes[write_index] = b'%';
+                    bytes[write_index + 1] = first_digit.unwrap().to_ascii_uppercase();
+                    bytes[write_index + 2] = second_digit.unwrap().to_ascii_uppercase();
+                    write_index += 3;
+                }
+            } else {
+                bytes[write_index] = byte;
+                write_index += 1;
+            }
+        }
+
+        bytes.truncate(write_index);
     }
 }
 
 impl AsRef<[u8]> for Query<'_> {
     fn as_ref(&self) -> &[u8] {
-        self.0.as_bytes()
+        self.query.as_bytes()
     }
 }
 
 impl AsRef<str> for Query<'_> {
     fn as_ref(&self) -> &str {
-        &self.0
+        &self.query
     }
 }
 
@@ -99,13 +148,13 @@ impl Deref for Query<'_> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.query
     }
 }
 
 impl Display for Query<'_> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        formatter.write_str(&self.0)
+        formatter.write_str(&self.query)
     }
 }
 
@@ -122,61 +171,61 @@ impl Hash for Query<'_> {
     where
         H: Hasher,
     {
-        percent_encoded_hash(self.0.as_bytes(), state, true);
+        percent_encoded_hash(self.query.as_bytes(), state, true);
     }
 }
 
 impl PartialEq for Query<'_> {
     fn eq(&self, other: &Query) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other.0.as_bytes(), true)
+        percent_encoded_equality(self.query.as_bytes(), other.query.as_bytes(), true)
     }
 }
 
 impl PartialEq<[u8]> for Query<'_> {
     fn eq(&self, other: &[u8]) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other, true)
+        percent_encoded_equality(self.query.as_bytes(), other, true)
     }
 }
 
 impl<'query> PartialEq<Query<'query>> for [u8] {
     fn eq(&self, other: &Query<'query>) -> bool {
-        percent_encoded_equality(self, other.0.as_bytes(), true)
+        percent_encoded_equality(self, other.query.as_bytes(), true)
     }
 }
 
 impl<'a> PartialEq<&'a [u8]> for Query<'_> {
     fn eq(&self, other: &&'a [u8]) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other, true)
+        percent_encoded_equality(self.query.as_bytes(), other, true)
     }
 }
 
 impl<'a, 'query> PartialEq<Query<'query>> for &'a [u8] {
     fn eq(&self, other: &Query<'query>) -> bool {
-        percent_encoded_equality(self, other.0.as_bytes(), true)
+        percent_encoded_equality(self, other.query.as_bytes(), true)
     }
 }
 
 impl PartialEq<str> for Query<'_> {
     fn eq(&self, other: &str) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), true)
+        percent_encoded_equality(self.query.as_bytes(), other.as_bytes(), true)
     }
 }
 
 impl<'query> PartialEq<Query<'query>> for str {
     fn eq(&self, other: &Query<'query>) -> bool {
-        percent_encoded_equality(self.as_bytes(), other.0.as_bytes(), true)
+        percent_encoded_equality(self.as_bytes(), other.query.as_bytes(), true)
     }
 }
 
 impl<'a> PartialEq<&'a str> for Query<'_> {
     fn eq(&self, other: &&'a str) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), true)
+        percent_encoded_equality(self.query.as_bytes(), other.as_bytes(), true)
     }
 }
 
 impl<'a, 'query> PartialEq<Query<'query>> for &'a str {
     fn eq(&self, other: &Query<'query>) -> bool {
-        percent_encoded_equality(self.as_bytes(), other.0.as_bytes(), true)
+        percent_encoded_equality(self.as_bytes(), other.query.as_bytes(), true)
     }
 }
 
@@ -249,18 +298,19 @@ pub(crate) fn parse_query<'query>(
 ) -> Result<(Query<'query>, &'query [u8]), InvalidQuery> {
     let mut bytes = value.iter();
     let mut end_index = 0;
+    let mut normalized = true;
 
     while let Some(&byte) = bytes.next() {
         match QUERY_CHAR_MAP[byte as usize] {
             0 if byte == b'#' => break,
             0 => return Err(InvalidQuery::InvalidCharacter),
-            b'%' => match (bytes.next(), bytes.next()) {
-                (Some(byte_1), Some(byte_2))
-                    if byte_1.is_ascii_hexdigit() && byte_2.is_ascii_hexdigit() =>
-                {
-                    end_index += 3;
+            b'%' => match get_percent_encoded_value(bytes.next().cloned(), bytes.next().cloned()) {
+                Ok((hex_value, uppercase)) => {
+                    if !uppercase || UNRESERVED_CHAR_MAP[hex_value as usize] != 0 {
+                        normalized = false;
+                    }
                 }
-                _ => return Err(InvalidQuery::InvalidPercentEncoding),
+                Err(_) => return Err(InvalidQuery::InvalidPercentEncoding),
             },
             _ => end_index += 1,
         }
@@ -269,6 +319,9 @@ pub(crate) fn parse_query<'query>(
     // Unsafe: The loop above makes sure this is safe.
 
     let (value, rest) = value.split_at(end_index);
-    let query = Query(Cow::from(unsafe { str::from_utf8_unchecked(value) }));
+    let query = Query {
+        normalized,
+        query: Cow::from(unsafe { str::from_utf8_unchecked(value) }),
+    };
     Ok((query, rest))
 }
