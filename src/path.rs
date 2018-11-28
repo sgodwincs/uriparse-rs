@@ -216,6 +216,31 @@ impl<'path> Path<'path> {
         Ok(())
     }
 
+    pub fn remove_dot_segments(&mut self) {
+        let mut new_length = 0;
+
+        for i in 0..self.segments.len() {
+            let segment = self.segments[i].as_str();
+
+            if segment == "." {
+                continue;
+            }
+
+            if segment == ".." {
+                if new_length > 0 {
+                    new_length -= 1;
+                }
+
+                continue;
+            }
+
+            self.segments.swap(i, new_length);
+            new_length += 1;
+        }
+
+        self.segments.truncate(new_length);
+    }
+
     /// Returns the segments of the path.
     ///
     /// If you require mutability, use [`Path::segments_mut`].
@@ -690,4 +715,48 @@ pub(crate) fn parse_path<'path>(
     let path = Path { absolute, segments };
 
     Ok((path, b""))
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_remove_dot_segments() {
+        let mut path = Path::try_from("").unwrap();
+        path.remove_dot_segments();
+        assert_eq!(path.to_string(), "");
+
+        let mut path = Path::try_from(".").unwrap();
+        path.remove_dot_segments();
+        assert_eq!(path.to_string(), "");
+
+        let mut path = Path::try_from("..").unwrap();
+        path.remove_dot_segments();
+        assert_eq!(path.to_string(), "");
+
+        let mut path = Path::try_from("/.").unwrap();
+        path.remove_dot_segments();
+        assert_eq!(path.to_string(), "/");
+
+        let mut path = Path::try_from("/..").unwrap();
+        path.remove_dot_segments();
+        assert_eq!(path.to_string(), "/");
+
+        let mut path = Path::try_from("../../.././.././../../../.").unwrap();
+        path.remove_dot_segments();
+        assert_eq!(path.to_string(), "");
+
+        let mut path = Path::try_from("/a/../../../../").unwrap();
+        path.remove_dot_segments();
+        assert_eq!(path.to_string(), "/");
+
+        let mut path = Path::try_from("/a/b/c/./../../g").unwrap();
+        path.remove_dot_segments();
+        assert_eq!(path.to_string(), "/a/g");
+
+        let mut path = Path::try_from("mid/content=5/../6").unwrap();
+        path.remove_dot_segments();
+        assert_eq!(path.to_string(), "mid/6");
+    }
 }
