@@ -58,6 +58,20 @@ pub struct Query<'query> {
 }
 
 impl Query<'_> {
+    pub fn as_borrowed(&self) -> Query {
+        use self::Cow::*;
+
+        let query = match &self.query {
+            Borrowed(borrowed) => *borrowed,
+            Owned(owned) => owned.as_str(),
+        };
+
+        Query {
+            normalized: self.normalized,
+            query: Cow::Borrowed(query),
+        }
+    }
+
     /// Returns a `str` representation of the query.
     ///
     /// # Examples

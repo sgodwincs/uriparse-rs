@@ -54,6 +54,20 @@ pub struct Fragment<'fragment> {
 }
 
 impl Fragment<'_> {
+    pub fn as_borrowed(&self) -> Fragment {
+        use self::Cow::*;
+
+        let fragment = match &self.fragment {
+            Borrowed(borrowed) => *borrowed,
+            Owned(owned) => owned.as_str(),
+        };
+
+        Fragment {
+            fragment: Cow::Borrowed(fragment),
+            normalized: self.normalized,
+        }
+    }
+
     /// Returns a `str` representation of the fragment.
     ///
     /// # Examples
