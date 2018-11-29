@@ -33,6 +33,10 @@ pub struct URI<'uri> {
 }
 
 impl<'uri> URI<'uri> {
+    pub fn as_uri_reference(&self) -> &URIReference<'uri> {
+        &self.uri_reference
+    }
+
     /// Returns the authority, if present, of the URI.
     ///
     /// # Examples

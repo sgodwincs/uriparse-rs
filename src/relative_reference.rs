@@ -21,6 +21,10 @@ pub struct RelativeReference<'uri> {
 }
 
 impl<'uri> RelativeReference<'uri> {
+    pub fn as_uri_reference(&self) -> &URIReference<'uri> {
+        &self.uri_reference
+    }
+
     /// Returns the authority, if present, of the relative reference.
     ///
     /// # Examples
