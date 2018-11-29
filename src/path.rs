@@ -223,6 +223,11 @@ impl<'path> Path<'path> {
             let segment = self.segments[i].as_str();
 
             if segment == "." {
+                if i == self.segments.len() - 1 {
+                    self.segments[new_length] = Segment::empty();
+                    new_length += 1;
+                }
+
                 continue;
             }
 
@@ -231,11 +236,20 @@ impl<'path> Path<'path> {
                     new_length -= 1;
                 }
 
+                if i == self.segments.len() - 1 {
+                    self.segments[new_length] = Segment::empty();
+                    new_length += 1;
+                }
+
                 continue;
             }
 
             self.segments.swap(i, new_length);
             new_length += 1;
+        }
+
+        if new_length == 0 {
+            self.segments.push(Segment::empty());
         }
 
         self.segments.truncate(new_length);
@@ -306,6 +320,19 @@ impl<'path> Path<'path> {
     /// ```
     pub fn set_absolute(&mut self, absolute: bool) {
         self.absolute = absolute;
+    }
+
+    pub fn to_borrowed(&self) -> Path {
+        let segments = self
+            .segments
+            .iter()
+            .map(|segment| segment.as_borrowed())
+            .collect();
+
+        Path {
+            absolute: self.absolute,
+            segments,
+        }
     }
 }
 
@@ -446,6 +473,17 @@ impl<'path> TryFrom<&'path str> for Path<'path> {
 pub struct Segment<'segment>(Cow<'segment, str>);
 
 impl Segment<'_> {
+    pub fn as_borrowed(&self) -> Segment {
+        use self::Cow::*;
+
+        let segment = match &self.0 {
+            Borrowed(borrowed) => *borrowed,
+            Owned(owned) => owned.as_str(),
+        };
+
+        Segment(Cow::Borrowed(segment))
+    }
+
     /// Returns a `str` representation of the segment.
     ///
     /// # Examples
@@ -750,6 +788,30 @@ mod test {
         let mut path = Path::try_from("/a/../../../../").unwrap();
         path.remove_dot_segments();
         assert_eq!(path.to_string(), "/");
+
+        let mut path = Path::try_from("/a/./././././././c").unwrap();
+        path.remove_dot_segments();
+        assert_eq!(path.to_string(), "/a/c");
+
+        let mut path = Path::try_from("/a/.").unwrap();
+        path.remove_dot_segments();
+        assert_eq!(path.to_string(), "/a/");
+
+        let mut path = Path::try_from("/a/./").unwrap();
+        path.remove_dot_segments();
+        assert_eq!(path.to_string(), "/a/");
+
+        let mut path = Path::try_from("/a/..").unwrap();
+        path.remove_dot_segments();
+        assert_eq!(path.to_string(), "/");
+
+        let mut path = Path::try_from("/a/b/./..").unwrap();
+        path.remove_dot_segments();
+        assert_eq!(path.to_string(), "/a/");
+
+        let mut path = Path::try_from("/a/b/./../").unwrap();
+        path.remove_dot_segments();
+        assert_eq!(path.to_string(), "/a/");
 
         let mut path = Path::try_from("/a/b/c/./../../g").unwrap();
         path.remove_dot_segments();

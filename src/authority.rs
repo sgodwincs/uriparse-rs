@@ -134,6 +134,29 @@ pub struct Authority<'authority> {
 }
 
 impl<'authority> Authority<'authority> {
+    pub fn as_borrowed(&self) -> Authority {
+        let host = match &self.host {
+            Host::RegisteredName(name) => Host::RegisteredName(name.as_borrowed()),
+            Host::IPv4Address(ipv4) => Host::IPv4Address(*ipv4),
+            Host::IPv6Address(ipv6) => Host::IPv6Address(*ipv6),
+        };
+        let password = self
+            .password
+            .as_ref()
+            .map(|password| password.as_borrowed());
+        let username = self
+            .username
+            .as_ref()
+            .map(|username| username.as_borrowed());
+
+        Authority {
+            host,
+            password,
+            port: self.port,
+            username,
+        }
+    }
+
     /// Constructs a new [`Authority`] from the individual parts: username, password, host, and
     /// port.
     ///
@@ -901,6 +924,17 @@ impl<'host> TryFrom<&'host str> for Host<'host> {
 pub struct Password<'password>(Cow<'password, str>);
 
 impl Password<'_> {
+    pub fn as_borrowed(&self) -> Password {
+        use self::Cow::*;
+
+        let password = match &self.0 {
+            Borrowed(borrowed) => *borrowed,
+            Owned(owned) => owned.as_str(),
+        };
+
+        Password(Cow::Borrowed(password))
+    }
+
     /// Returns a `str` representation of the password.
     ///
     /// # Examples
@@ -1061,6 +1095,17 @@ impl<'password> TryFrom<&'password str> for Password<'password> {
 pub struct RegisteredName<'name>(Cow<'name, str>);
 
 impl RegisteredName<'_> {
+    pub fn as_borrowed(&self) -> RegisteredName {
+        use self::Cow::*;
+
+        let name = match &self.0 {
+            Borrowed(borrowed) => *borrowed,
+            Owned(owned) => owned.as_str(),
+        };
+
+        RegisteredName(Cow::Borrowed(name))
+    }
+
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -1192,6 +1237,17 @@ impl<'name> TryFrom<&'name str> for RegisteredName<'name> {
 pub struct Username<'username>(Cow<'username, str>);
 
 impl Username<'_> {
+    pub fn as_borrowed(&self) -> Username {
+        use self::Cow::*;
+
+        let username = match &self.0 {
+            Borrowed(borrowed) => *borrowed,
+            Owned(owned) => owned.as_str(),
+        };
+
+        Username(Cow::Borrowed(username))
+    }
+
     pub fn as_str(&self) -> &str {
         &self.0
     }
