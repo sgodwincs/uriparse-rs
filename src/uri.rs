@@ -590,6 +590,82 @@ impl<'uri> URI<'uri> {
         self.uri_reference.query()
     }
 
+    pub fn resolve(&self, reference: &'uri URIReference<'uri>) -> URI<'uri> {
+        let mut builder = URIBuilder::new();
+
+        if let Some(scheme) = reference.scheme() {
+            let mut path = reference.path().clone();
+            path.remove_dot_segments();
+
+            builder
+                .scheme(scheme.clone())
+                .authority(reference.authority().cloned())
+                .path(path)
+                .query(reference.query().cloned());
+        } else {
+            if reference.authority().is_some() {
+                let mut path = reference.path().clone();
+                path.remove_dot_segments();
+
+                builder
+                    .authority(reference.authority().cloned())
+                    .path(path)
+                    .query(reference.query().cloned());
+            } else {
+                if reference.path().is_relative()
+                    && reference.path().segments().len() == 1
+                    && reference.path().segments()[0] == ""
+                {
+                    let mut path = self.path().clone();
+                    path.remove_dot_segments();
+                    builder.path(path);
+
+                    if reference.query().is_some() {
+                        builder.query(reference.query().cloned());
+                    } else {
+                        builder.query(self.query().cloned());
+                    }
+                } else {
+                    if reference.path().is_absolute() {
+                        let mut path = reference.path().clone();
+                        path.remove_dot_segments();
+                        builder.path(path);
+                    } else {
+                        let mut path = if self.authority().is_some()
+                            && self.path().segments().len() == 1
+                            && self.path().segments()[0] == ""
+                        {
+                            let mut path = reference.path().clone();
+                            path.set_absolute(true);
+                            path
+                        } else {
+                            let mut path = self.path().clone();
+                            path.pop();
+
+                            for segment in reference.path().segments() {
+                                path.push(segment.clone()).unwrap();
+                            }
+
+                            path
+                        };
+
+                        path.remove_dot_segments();
+                        builder.path(path);
+                    }
+
+                    builder.query(reference.query().cloned());
+                }
+
+                builder.authority(self.authority().cloned());
+            }
+
+            builder.scheme(self.scheme().clone());
+        }
+
+        builder.fragment(reference.fragment().cloned());
+        builder.build().unwrap()
+    }
+
     /// Returns the scheme of the URI.
     ///
     /// # Examples
@@ -1173,5 +1249,62 @@ impl TryFrom<InvalidURIReference> for InvalidURI {
             InvalidURIReference::InvalidScheme(invalid_scheme) => Ok(InvalidScheme(invalid_scheme)),
             InvalidURIReference::MissingPath => Ok(MissingPath),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_resolve() {
+        fn test_case(value: &str, expected: &str) {
+            let base_uri = URI::try_from("http://a/b/c/d;p?q").unwrap();
+            let reference = URIReference::try_from(value).unwrap();
+            assert_eq!(base_uri.resolve(&reference).to_string(), expected);
+        }
+
+        test_case("g:h", "g:h");
+        test_case("g", "http://a/b/c/g");
+        test_case("./g", "http://a/b/c/g");
+        test_case("g/", "http://a/b/c/g/");
+        test_case("/g", "http://a/g");
+        test_case("//g", "http://g/");
+        test_case("?y", "http://a/b/c/d;p?y");
+        test_case("g?y", "http://a/b/c/g?y");
+        test_case("#s", "http://a/b/c/d;p?q#s");
+        test_case("g#s", "http://a/b/c/g#s");
+        test_case("g?y#s", "http://a/b/c/g?y#s");
+        test_case(";x", "http://a/b/c/;x");
+        test_case("g;x", "http://a/b/c/g;x");
+        test_case("g;x?y#s", "http://a/b/c/g;x?y#s");
+        test_case("", "http://a/b/c/d;p?q");
+        test_case(".", "http://a/b/c/");
+        test_case("./", "http://a/b/c/");
+        test_case("..", "http://a/b/");
+        test_case("../", "http://a/b/");
+        test_case("../g", "http://a/b/g");
+        test_case("../..", "http://a/");
+        test_case("../../", "http://a/");
+        test_case("../../g", "http://a/g");
+        test_case("../../../g", "http://a/g");
+        test_case("../../../g", "http://a/g");
+        test_case("/./g", "http://a/g");
+        test_case("/../g", "http://a/g");
+        test_case("g.", "http://a/b/c/g.");
+        test_case(".g", "http://a/b/c/.g");
+        test_case("g..", "http://a/b/c/g..");
+        test_case("..g", "http://a/b/c/..g");
+        test_case("./../g", "http://a/b/g");
+        test_case("./g/.", "http://a/b/c/g/");
+        test_case("g/./h", "http://a/b/c/g/h");
+        test_case("g/../h", "http://a/b/c/h");
+        test_case("g;x=1/./y", "http://a/b/c/g;x=1/y");
+        test_case("g;x=1/../y", "http://a/b/c/y");
+        test_case("g?y/./x", "http://a/b/c/g?y/./x");
+        test_case("g?y/../x", "http://a/b/c/g?y/../x");
+        test_case("g#s/./x", "http://a/b/c/g#s/./x");
+        test_case("g#s/../x", "http://a/b/c/g#s/../x");
+        test_case("http:g", "http:g");
     }
 }
