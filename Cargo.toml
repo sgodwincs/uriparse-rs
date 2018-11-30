@@ -15,6 +15,7 @@ harness = false
 name = "parse"
 
 [dependencies]
+fnv = "1.0.6"
 lazy_static = "1.2.0"
 
 [dev-dependencies]
