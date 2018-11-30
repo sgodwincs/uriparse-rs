@@ -4,13 +4,14 @@
 //! the listed schemes, see
 //! [iana.org](https://www.iana.org/assignments/uri-schemes/uri-schemes.xhtml).
 
+use fnv::FnvBuildHasher;
 use lazy_static::lazy_static;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
-use std::hash::{Hash, Hasher};
+use std::hash::{BuildHasher, Hash, Hasher};
 use std::str;
 
 /// The length of the longest currently registered scheme. This is used internally for parsing. Make
@@ -51,11 +52,14 @@ macro_rules! schemes {
         lazy_static! {
             /// An immutable hashmap mapping scheme names to their corresponding [`Scheme`]
             /// variants.
-            static ref SCHEME_NAME_MAP: HashMap<&'static [u8], Scheme<'static>> = {
-                let mut map = HashMap::with_capacity(NUMBER_OF_SCHEMES);
+            static ref SCHEME_NAME_MAP: HashMap<&'static [u8], Scheme<'static>, FnvBuildHasher> = {
+                let mut map = HashMap::with_capacity_and_hasher(
+                    NUMBER_OF_SCHEMES,
+                    FnvBuildHasher::default()
+                );
 
             $(
-                map.insert($name.as_bytes(), Scheme::$variant);
+                assert!(map.insert($name.as_bytes(), Scheme::$variant).is_none());
             )+
 
                 map
