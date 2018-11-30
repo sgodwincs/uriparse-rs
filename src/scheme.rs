@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
-use std::hash::{BuildHasher, Hash, Hasher};
+use std::hash::{Hash, Hasher};
 use std::str;
 
 /// The length of the longest currently registered scheme. This is used internally for parsing. Make
