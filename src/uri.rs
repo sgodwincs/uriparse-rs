@@ -618,7 +618,7 @@ impl<'uri> URI<'uri> {
             } else {
                 if reference.path().is_relative()
                     && reference.path().segments().len() == 1
-                    && reference.path().segments()[0] == ""
+                    && reference.path().segments()[0].is_empty()
                 {
                     let mut path = self.path().clone();
                     path.remove_dot_segments();
@@ -637,7 +637,7 @@ impl<'uri> URI<'uri> {
                     } else {
                         let mut path = if self.authority().is_some()
                             && self.path().segments().len() == 1
-                            && self.path().segments()[0] == ""
+                            && self.path().segments()[0].is_empty()
                         {
                             let mut path = reference.path().clone();
                             path.set_absolute(true);
