@@ -46,7 +46,8 @@ fn hex_digit_to_decimal(digit: u8) -> Result<(u8, bool), ()> {
     }
 }
 
-pub fn normalize_bytes(bytes: &mut Vec<u8>) {
+pub fn normalize_string(string: &mut String) {
+    let bytes = unsafe { string.as_mut_vec() };
     let mut read_index = 0;
     let mut write_index = 0;
 

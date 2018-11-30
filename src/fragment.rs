@@ -11,7 +11,7 @@ use std::ops::Deref;
 use std::str;
 
 use crate::utility::{
-    get_percent_encoded_value, normalize_bytes, percent_encoded_equality, percent_encoded_hash,
+    get_percent_encoded_value, normalize_string, percent_encoded_equality, percent_encoded_hash,
     UNRESERVED_CHAR_MAP,
 };
 
@@ -107,8 +107,8 @@ impl Fragment<'_> {
 
     pub fn normalize(&mut self) {
         if !self.normalized {
-            let bytes = unsafe { self.fragment.to_mut().as_mut_vec() };
-            normalize_bytes(bytes);
+            normalize_string(&mut self.fragment.to_mut());
+            self.normalized = true;
         }
     }
 }
