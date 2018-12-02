@@ -927,6 +927,8 @@ mod test {
         test_case("..", "..", true);
         test_case("../", "../", true);
         test_case("/.", "/", true);
+        test_case("./././././././.", "", true);
+        test_case("././././././././", "", true);
         test_case("/..", "/", true);
         test_case("../..", "../..", true);
         test_case("../a/../..", "../..", true);
