@@ -7,7 +7,6 @@ use std::convert::TryFrom;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter, Write};
 use std::hash::{Hash, Hasher};
-use std::mem;
 use std::ops::Deref;
 use std::str;
 
