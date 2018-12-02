@@ -7,10 +7,14 @@ use std::convert::TryFrom;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter, Write};
 use std::hash::{Hash, Hasher};
+use std::mem;
 use std::ops::Deref;
 use std::str;
 
-use crate::utility::{percent_encoded_equality, percent_encoded_hash};
+use crate::utility::{
+    get_percent_encoded_value, normalize_string, percent_encoded_equality, percent_encoded_hash,
+    UNRESERVED_CHAR_MAP,
+};
 
 /// A map of byte characters that determines if a character is a valid path character.
 #[cfg_attr(rustfmt, rustfmt_skip)]
@@ -49,6 +53,8 @@ pub struct Path<'path> {
 
     /// The sequence of segments that compose the path.
     segments: Vec<Segment<'path>>,
+
+    unnormalized_count: usize,
 }
 
 impl<'path> Path<'path> {
@@ -91,6 +97,7 @@ impl<'path> Path<'path> {
         Path {
             absolute: self.absolute,
             segments,
+            unnormalized_count: self.unnormalized_count,
         }
     }
 
@@ -142,7 +149,60 @@ impl<'path> Path<'path> {
         Path {
             absolute: absolute,
             segments: Vec::new(),
+            unnormalized_count: 0,
         }
+    }
+
+    pub fn normalize(&mut self, mut as_reference: bool) {
+        if self.absolute {
+            as_reference = false;
+        }
+
+        self.unnormalized_count = 0;
+
+        if !as_reference {
+            self.remove_dot_segments_helper(true);
+            return;
+        }
+
+        let mut last_dot_segment = None;
+        let mut new_length = 0;
+
+        for i in 0..self.segments.len() {
+            let segment = self.segments[i].as_str();
+
+            if segment == "."
+                && (new_length > 0
+                    || i == self.segments.len() - 1
+                    || !self.segments[i + 1].as_str().contains(':'))
+            {
+                continue;
+            }
+
+            if segment == ".." {
+                match last_dot_segment {
+                    None if new_length == 0 => (),
+                    Some(index) if index == new_length - 1 => (),
+                    _ => {
+                        new_length -= 1;
+                        continue;
+                    }
+                }
+
+                last_dot_segment = Some(new_length);
+            }
+
+            self.segments.swap(i, new_length);
+            self.segments[new_length].normalize();
+            new_length += 1;
+        }
+
+        if new_length == 0 {
+            self.segments[0] = Segment::empty();
+            new_length = 1;
+        }
+
+        self.segments.truncate(new_length);
     }
 
     /// Pops the last segment off of the path.
@@ -163,7 +223,9 @@ impl<'path> Path<'path> {
     /// assert_eq!(path, "/");
     /// ```
     pub fn pop(&mut self) {
-        self.segments.pop();
+        if !self.segments.pop().unwrap().is_normalized() {
+            self.unnormalized_count -= 1;
+        }
 
         if self.segments.is_empty() {
             self.segments.push(Segment::empty());
@@ -207,6 +269,10 @@ impl<'path> Path<'path> {
     {
         let segment = Segment::try_from(segment)?;
 
+        if !segment.is_normalized() {
+            self.unnormalized_count += 1;
+        }
+
         if segment != "" && self.segments.len() == 1 && self.segments[0].as_str().is_empty() {
             self.segments[0] = segment;
         } else {
@@ -217,39 +283,63 @@ impl<'path> Path<'path> {
     }
 
     pub fn remove_dot_segments(&mut self) {
+        self.remove_dot_segments_helper(false);
+    }
+
+    fn remove_dot_segments_helper(&mut self, normalize_segments: bool) {
+        let mut input_absolute = self.absolute;
         let mut new_length = 0;
 
         for i in 0..self.segments.len() {
             let segment = self.segments[i].as_str();
 
-            if segment == "." {
-                if i == self.segments.len() - 1 {
-                    self.segments[new_length] = Segment::empty();
-                    new_length += 1;
+            if input_absolute {
+                if segment == "." {
+                    continue;
+                } else if segment == ".." {
+                    if new_length > 0 {
+                        new_length -= 1;
+                    } else {
+                        self.absolute = false;
+                    }
+
+                    continue;
                 }
 
-                continue;
-            }
-
-            if segment == ".." {
-                if new_length > 0 {
-                    new_length -= 1;
+                if new_length == 0 {
+                    self.absolute = true;
                 }
-
-                if i == self.segments.len() - 1 {
-                    self.segments[new_length] = Segment::empty();
-                    new_length += 1;
-                }
-
+            } else if segment == ".." || segment == "." {
                 continue;
             }
 
             self.segments.swap(i, new_length);
+
+            if normalize_segments {
+                self.segments[new_length].normalize();
+            }
+
             new_length += 1;
+
+            if i < self.segments.len() - 1 {
+                input_absolute = true;
+            } else {
+                input_absolute = false;
+            }
+        }
+
+        if input_absolute {
+            if new_length == 0 {
+                self.absolute = true;
+            } else {
+                self.segments[new_length] = Segment::empty();
+                new_length += 1;
+            }
         }
 
         if new_length == 0 {
-            self.segments.push(Segment::empty());
+            self.segments[0] = Segment::empty();
+            new_length = 1;
         }
 
         self.segments.truncate(new_length);
@@ -332,6 +422,7 @@ impl<'path> Path<'path> {
         Path {
             absolute: self.absolute,
             segments,
+            unnormalized_count: self.unnormalized_count,
         }
     }
 }
@@ -470,18 +561,24 @@ impl<'path> TryFrom<&'path str> for Path<'path> {
 ///
 /// Segments are separated from other segments with the `'/'` delimiter.
 #[derive(Clone, Debug)]
-pub struct Segment<'segment>(Cow<'segment, str>);
+pub struct Segment<'segment> {
+    normalized: bool,
+    segment: Cow<'segment, str>,
+}
 
 impl Segment<'_> {
     pub fn as_borrowed(&self) -> Segment {
         use self::Cow::*;
 
-        let segment = match &self.0 {
+        let segment = match &self.segment {
             Borrowed(borrowed) => *borrowed,
             Owned(owned) => owned.as_str(),
         };
 
-        Segment(Cow::Borrowed(segment))
+        Segment {
+            normalized: self.normalized,
+            segment: Cow::Borrowed(segment),
+        }
     }
 
     /// Returns a `str` representation of the segment.
@@ -499,7 +596,7 @@ impl Segment<'_> {
     /// assert_eq!(segment.as_str(), "segment");
     /// ```
     pub fn as_str(&self) -> &str {
-        &self.0
+        &self.segment
     }
 
     /// Constructs a segment that is empty.
@@ -512,7 +609,10 @@ impl Segment<'_> {
     /// assert_eq!(Segment::empty(),  "");
     /// ```
     pub fn empty() -> Segment<'static> {
-        Segment(Cow::from(""))
+        Segment {
+            normalized: true,
+            segment: Cow::from(""),
+        }
     }
 
     /// Converts the [`Segment`] into an owned copy.
@@ -524,19 +624,33 @@ impl Segment<'_> {
     /// This is different from just cloning. Cloning the segment will just copy the references, and
     /// thus the lifetime will remain the same.
     pub fn into_owned(self) -> Segment<'static> {
-        Segment(Cow::from(self.0.into_owned()))
+        Segment {
+            normalized: self.normalized,
+            segment: Cow::from(self.segment.into_owned()),
+        }
+    }
+
+    pub fn is_normalized(&self) -> bool {
+        self.normalized
+    }
+
+    pub fn normalize(&mut self) {
+        if !self.normalized {
+            normalize_string(&mut self.segment.to_mut());
+            self.normalized = true;
+        }
     }
 }
 
 impl AsRef<[u8]> for Segment<'_> {
     fn as_ref(&self) -> &[u8] {
-        self.0.as_bytes()
+        self.segment.as_bytes()
     }
 }
 
 impl AsRef<str> for Segment<'_> {
     fn as_ref(&self) -> &str {
-        &self.0
+        &self.segment
     }
 }
 
@@ -544,13 +658,13 @@ impl Deref for Segment<'_> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.segment
     }
 }
 
 impl Display for Segment<'_> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        formatter.write_str(&self.0)
+        formatter.write_str(&self.segment)
     }
 }
 
@@ -567,61 +681,61 @@ impl Hash for Segment<'_> {
     where
         H: Hasher,
     {
-        percent_encoded_hash(self.0.as_bytes(), state, true);
+        percent_encoded_hash(self.segment.as_bytes(), state, true);
     }
 }
 
 impl PartialEq for Segment<'_> {
     fn eq(&self, other: &Segment) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other.0.as_bytes(), true)
+        percent_encoded_equality(self.segment.as_bytes(), other.segment.as_bytes(), true)
     }
 }
 
 impl PartialEq<[u8]> for Segment<'_> {
     fn eq(&self, other: &[u8]) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other, true)
+        percent_encoded_equality(self.segment.as_bytes(), other, true)
     }
 }
 
 impl<'segment> PartialEq<Segment<'segment>> for [u8] {
     fn eq(&self, other: &Segment<'segment>) -> bool {
-        percent_encoded_equality(self, other.0.as_bytes(), true)
+        percent_encoded_equality(self, other.segment.as_bytes(), true)
     }
 }
 
 impl<'a> PartialEq<&'a [u8]> for Segment<'_> {
     fn eq(&self, other: &&'a [u8]) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other, true)
+        percent_encoded_equality(self.segment.as_bytes(), other, true)
     }
 }
 
 impl<'a, 'segment> PartialEq<Segment<'segment>> for &'a [u8] {
     fn eq(&self, other: &Segment<'segment>) -> bool {
-        percent_encoded_equality(self, other.0.as_bytes(), true)
+        percent_encoded_equality(self, other.segment.as_bytes(), true)
     }
 }
 
 impl PartialEq<str> for Segment<'_> {
     fn eq(&self, other: &str) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), true)
+        percent_encoded_equality(self.segment.as_bytes(), other.as_bytes(), true)
     }
 }
 
 impl<'segment> PartialEq<Segment<'segment>> for str {
     fn eq(&self, other: &Segment<'segment>) -> bool {
-        percent_encoded_equality(self.as_bytes(), other.0.as_bytes(), true)
+        percent_encoded_equality(self.as_bytes(), other.segment.as_bytes(), true)
     }
 }
 
 impl<'a> PartialEq<&'a str> for Segment<'_> {
     fn eq(&self, other: &&'a str) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), true)
+        percent_encoded_equality(self.segment.as_bytes(), other.as_bytes(), true)
     }
 }
 
 impl<'a, 'segment> PartialEq<Segment<'segment>> for &'a str {
     fn eq(&self, other: &Segment<'segment>) -> bool {
-        percent_encoded_equality(self.as_bytes(), other.0.as_bytes(), true)
+        percent_encoded_equality(self.as_bytes(), other.segment.as_bytes(), true)
     }
 }
 
@@ -630,23 +744,29 @@ impl<'segment> TryFrom<&'segment [u8]> for Segment<'segment> {
 
     fn try_from(value: &'segment [u8]) -> Result<Self, Self::Error> {
         let mut bytes = value.iter();
+        let mut normalized = true;
 
         while let Some(&byte) = bytes.next() {
             match PATH_CHAR_MAP[byte as usize] {
                 0 => return Err(InvalidPath::InvalidCharacter),
-                b'%' => match (bytes.next(), bytes.next()) {
-                    (Some(byte_1), Some(byte_2))
-                        if byte_1.is_ascii_hexdigit() && byte_2.is_ascii_hexdigit() =>
-                    {
-                        ()
+                b'%' => {
+                    match get_percent_encoded_value(bytes.next().cloned(), bytes.next().cloned()) {
+                        Ok((hex_value, uppercase)) => {
+                            if !uppercase || UNRESERVED_CHAR_MAP[hex_value as usize] != 0 {
+                                normalized = false;
+                            }
+                        }
+                        Err(_) => return Err(InvalidPath::InvalidPercentEncoding),
                     }
-                    _ => return Err(InvalidPath::InvalidPercentEncoding),
-                },
+                }
                 _ => (),
             }
         }
 
-        let segment = Segment(Cow::Borrowed(unsafe { str::from_utf8_unchecked(value) }));
+        let segment = Segment {
+            normalized,
+            segment: Cow::Borrowed(unsafe { str::from_utf8_unchecked(value) }),
+        };
         Ok(segment)
     }
 }
@@ -704,10 +824,21 @@ impl From<!> for InvalidPath {
 pub(crate) fn parse_path<'path>(
     value: &'path [u8],
 ) -> Result<(Path<'path>, &'path [u8]), InvalidPath> {
-    fn new_segment<'segment>(segment: &'segment [u8]) -> Segment<'segment> {
+    fn new_segment<'segment>(
+        segment: &'segment [u8],
+        normalized: bool,
+        unnormalized_count: &mut usize,
+    ) -> Segment<'segment> {
+        if !normalized {
+            *unnormalized_count += 1;
+        }
+
         // Unsafe: The loop below makes sure this is safe.
 
-        Segment(Cow::from(unsafe { str::from_utf8_unchecked(segment) }))
+        Segment {
+            normalized,
+            segment: Cow::from(unsafe { str::from_utf8_unchecked(segment) }),
+        }
     }
 
     let (value, absolute) = if value.starts_with(b"/") {
@@ -717,6 +848,8 @@ pub(crate) fn parse_path<'path>(
     };
 
     let mut bytes = value.iter();
+    let mut normalized = true;
+    let mut unnormalized_count = 0;
     let mut segment_end_index = 0;
     let mut segment_start_index = 0;
 
@@ -726,32 +859,58 @@ pub(crate) fn parse_path<'path>(
     while let Some(&byte) = bytes.next() {
         match PATH_CHAR_MAP[byte as usize] {
             0 if byte == b'?' || byte == b'#' => {
-                segments.push(new_segment(&value[segment_start_index..segment_end_index]));
-                let path = Path { absolute, segments };
+                let segment = new_segment(
+                    &value[segment_start_index..segment_end_index],
+                    normalized,
+                    &mut unnormalized_count,
+                );
+                segments.push(segment);
+                let path = Path {
+                    absolute,
+                    segments,
+                    unnormalized_count,
+                };
 
                 return Ok((path, &value[segment_end_index..]));
             }
             0 if byte == b'/' => {
-                segments.push(new_segment(&value[segment_start_index..segment_end_index]));
+                let segment = new_segment(
+                    &value[segment_start_index..segment_end_index],
+                    normalized,
+                    &mut unnormalized_count,
+                );
+                segments.push(segment);
                 segment_end_index += 1;
                 segment_start_index = segment_end_index;
+                normalized = true;
             }
             0 => return Err(InvalidPath::InvalidCharacter),
-            b'%' => match (bytes.next(), bytes.next()) {
-                (Some(byte_1), Some(byte_2))
-                    if byte_1.is_ascii_hexdigit() && byte_2.is_ascii_hexdigit() =>
-                {
+            b'%' => match get_percent_encoded_value(bytes.next().cloned(), bytes.next().cloned()) {
+                Ok((hex_value, uppercase)) => {
+                    if !uppercase || UNRESERVED_CHAR_MAP[hex_value as usize] != 0 {
+                        normalized = false;
+                    }
+
                     segment_end_index += 3;
                 }
-                _ => return Err(InvalidPath::InvalidPercentEncoding),
+                Err(_) => return Err(InvalidPath::InvalidPercentEncoding),
             },
             _ => segment_end_index += 1,
         }
     }
 
-    segments.push(new_segment(&value[segment_start_index..]));
-    let path = Path { absolute, segments };
+    let segment = new_segment(
+        &value[segment_start_index..],
+        normalized,
+        &mut unnormalized_count,
+    );
+    segments.push(segment);
 
+    let path = Path {
+        absolute,
+        segments,
+        unnormalized_count,
+    };
     Ok((path, b""))
 }
 
@@ -760,65 +919,86 @@ mod test {
     use super::*;
 
     #[test]
+    fn test_normalize() {
+        fn test_case(value: &str, expected: &str, as_reference: bool) {
+            let mut path = Path::try_from(value).unwrap();
+            path.normalize(as_reference);
+            assert!(!path.segments().is_empty());
+            assert_eq!(path.to_string(), expected);
+        }
+
+        test_case("", "", true);
+        test_case(".", "", true);
+        test_case("..", "..", true);
+        test_case("../", "../", true);
+        test_case("/.", "/", true);
+        test_case("/..", "/", true);
+        test_case("../..", "../..", true);
+        test_case("../a/../..", "../..", true);
+        test_case("a", "a", true);
+        test_case("a/..", "", true);
+        test_case("a/../", "", true);
+        test_case("a/../..", "..", true);
+        test_case("./a:b", "./a:b", true);
+        test_case("./../a:b", "../a:b", true);
+        test_case("../a/../", "../", true);
+        test_case("../../.././.././../../../.", "../../../../../../..", true);
+        test_case("a/.././a:b", "./a:b", true);
+
+        test_case("", "", false);
+        test_case(".", "", false);
+        test_case("..", "", false);
+        test_case("../", "", false);
+        test_case("/.", "/", false);
+        test_case("/..", "/", false);
+        test_case("../../.././.././../../../.", "", false);
+        test_case("a/../..", "/", false);
+        test_case("a/../../", "/", false);
+        test_case("/a/../../../../", "/", false);
+        test_case("/a/./././././././c", "/a/c", false);
+        test_case("/a/.", "/a/", false);
+        test_case("/a/./", "/a/", false);
+        test_case("/a/..", "/", false);
+        test_case("/a/b/./..", "/a/", false);
+        test_case("/a/b/./../", "/a/", false);
+        test_case("/a/b/c/./../../g", "/a/g", false);
+        test_case("mid/content=5/../6", "mid/6", false);
+
+        test_case("this/is/a/t%65st/path/%ff", "this/is/a/test/path/%FF", true);
+        test_case(
+            "this/is/a/t%65st/path/%ff",
+            "this/is/a/test/path/%FF",
+            false,
+        );
+    }
+
+    #[test]
     fn test_remove_dot_segments() {
-        let mut path = Path::try_from("").unwrap();
-        path.remove_dot_segments();
-        assert_eq!(path.to_string(), "");
+        fn test_case(value: &str, expected: &str) {
+            let mut path = Path::try_from(value).unwrap();
+            path.remove_dot_segments();
+            assert!(!path.segments().is_empty());
+            assert_eq!(path.to_string(), expected);
+        }
 
-        let mut path = Path::try_from(".").unwrap();
-        path.remove_dot_segments();
-        assert_eq!(path.to_string(), "");
-
-        let mut path = Path::try_from("..").unwrap();
-        path.remove_dot_segments();
-        assert_eq!(path.to_string(), "");
-
-        let mut path = Path::try_from("/.").unwrap();
-        path.remove_dot_segments();
-        assert_eq!(path.to_string(), "/");
-
-        let mut path = Path::try_from("/..").unwrap();
-        path.remove_dot_segments();
-        assert_eq!(path.to_string(), "/");
-
-        let mut path = Path::try_from("../../.././.././../../../.").unwrap();
-        path.remove_dot_segments();
-        assert_eq!(path.to_string(), "");
-
-        let mut path = Path::try_from("/a/../../../../").unwrap();
-        path.remove_dot_segments();
-        assert_eq!(path.to_string(), "/");
-
-        let mut path = Path::try_from("/a/./././././././c").unwrap();
-        path.remove_dot_segments();
-        assert_eq!(path.to_string(), "/a/c");
-
-        let mut path = Path::try_from("/a/.").unwrap();
-        path.remove_dot_segments();
-        assert_eq!(path.to_string(), "/a/");
-
-        let mut path = Path::try_from("/a/./").unwrap();
-        path.remove_dot_segments();
-        assert_eq!(path.to_string(), "/a/");
-
-        let mut path = Path::try_from("/a/..").unwrap();
-        path.remove_dot_segments();
-        assert_eq!(path.to_string(), "/");
-
-        let mut path = Path::try_from("/a/b/./..").unwrap();
-        path.remove_dot_segments();
-        assert_eq!(path.to_string(), "/a/");
-
-        let mut path = Path::try_from("/a/b/./../").unwrap();
-        path.remove_dot_segments();
-        assert_eq!(path.to_string(), "/a/");
-
-        let mut path = Path::try_from("/a/b/c/./../../g").unwrap();
-        path.remove_dot_segments();
-        assert_eq!(path.to_string(), "/a/g");
-
-        let mut path = Path::try_from("mid/content=5/../6").unwrap();
-        path.remove_dot_segments();
-        assert_eq!(path.to_string(), "mid/6");
+        test_case("", "");
+        test_case(".", "");
+        test_case("..", "");
+        test_case("../", "");
+        test_case("/.", "/");
+        test_case("/..", "/");
+        test_case("../../.././.././../../../.", "");
+        test_case("a/../..", "/");
+        test_case("a/../../", "/");
+        test_case("/a/../../../..", "/");
+        test_case("/a/../../../../", "/");
+        test_case("/a/./././././././c", "/a/c");
+        test_case("/a/.", "/a/");
+        test_case("/a/./", "/a/");
+        test_case("/a/..", "/");
+        test_case("/a/b/./..", "/a/");
+        test_case("/a/b/./../", "/a/");
+        test_case("/a/b/c/./../../g", "/a/g");
+        test_case("mid/content=5/../6", "mid/6");
     }
 }
