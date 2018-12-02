@@ -152,14 +152,10 @@ impl<'path> Path<'path> {
         }
     }
 
-    pub fn normalize(&mut self, mut as_reference: bool) {
-        if self.absolute {
-            as_reference = false;
-        }
-
+    pub fn normalize(&mut self, as_reference: bool) {
         self.unnormalized_count = 0;
 
-        if !as_reference {
+        if self.absolute || !as_reference {
             self.remove_dot_segments_helper(true);
             return;
         }
