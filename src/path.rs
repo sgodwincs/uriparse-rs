@@ -50,6 +50,10 @@ pub struct Path<'path> {
     /// `'/'`.
     absolute: bool,
 
+    dot_segment_count: usize,
+
+    leading_dot_segment_count: usize,
+
     /// The sequence of segments that compose the path.
     segments: Vec<Segment<'path>>,
 
@@ -78,6 +82,10 @@ impl<'path> Path<'path> {
         self.segments.push(Segment::empty());
     }
 
+    pub fn dot_segment_count(&self) -> usize {
+        self.dot_segment_count
+    }
+
     /// Converts the [`Path`] into an owned copy.
     ///
     /// If you construct the path from a source with a non-static lifetime, you may run into
@@ -95,6 +103,8 @@ impl<'path> Path<'path> {
 
         Path {
             absolute: self.absolute,
+            dot_segment_count: self.dot_segment_count,
+            leading_dot_segment_count: self.leading_dot_segment_count,
             segments,
             unnormalized_count: self.unnormalized_count,
         }
@@ -120,6 +130,10 @@ impl<'path> Path<'path> {
         self.absolute
     }
 
+    pub fn is_normalized(&self) -> bool {
+        self.unnormalized_count == 0 && self.dot_segment_count == self.leading_dot_segment_count
+    }
+
     /// Returns whether or not the path is relative (i.e. it does not start with a `'/'`).
     ///
     /// Any path following an [`Authority`] will *always* be parsed to be absolute.
@@ -140,6 +154,10 @@ impl<'path> Path<'path> {
         !self.absolute
     }
 
+    pub fn leading_dot_segment_count(&self) -> usize {
+        self.leading_dot_segment_count
+    }
+
     /// Creates a path with no segments on it.
     ///
     /// This is only used to avoid allocations for temporary paths. Any path created using this
@@ -147,12 +165,18 @@ impl<'path> Path<'path> {
     pub(crate) unsafe fn new_with_no_segments(absolute: bool) -> Path<'static> {
         Path {
             absolute: absolute,
+            dot_segment_count: 0,
+            leading_dot_segment_count: 0,
             segments: Vec::new(),
             unnormalized_count: 0,
         }
     }
 
     pub fn normalize(&mut self, as_reference: bool) {
+        if self.is_normalized() {
+            return;
+        }
+
         self.unnormalized_count = 0;
 
         if self.absolute || !as_reference {
@@ -160,18 +184,22 @@ impl<'path> Path<'path> {
             return;
         }
 
+        let mut dot_segment_count = 0;
         let mut last_dot_segment = None;
         let mut new_length = 0;
 
         for i in 0..self.segments.len() {
             let segment = self.segments[i].as_str();
 
-            if segment == "."
-                && (new_length > 0
+            if segment == "." {
+                if new_length > 0
                     || i == self.segments.len() - 1
-                    || !self.segments[i + 1].as_str().contains(':'))
-            {
-                continue;
+                    || !self.segments[i + 1].as_str().contains(':')
+                {
+                    continue;
+                }
+
+                dot_segment_count += 1;
             }
 
             if segment == ".." {
@@ -184,6 +212,7 @@ impl<'path> Path<'path> {
                     }
                 }
 
+                dot_segment_count += 1;
                 last_dot_segment = Some(new_length);
             }
 
@@ -197,6 +226,8 @@ impl<'path> Path<'path> {
             new_length = 1;
         }
 
+        self.dot_segment_count = dot_segment_count;
+        self.leading_dot_segment_count = dot_segment_count;
         self.segments.truncate(new_length);
     }
 
@@ -218,8 +249,18 @@ impl<'path> Path<'path> {
     /// assert_eq!(path, "/");
     /// ```
     pub fn pop(&mut self) {
-        if !self.segments.pop().unwrap().is_normalized() {
-            self.unnormalized_count -= 1;
+        let segment = self.segments.pop().unwrap();
+
+        if segment.is_dot_segment() {
+            self.dot_segment_count = self.dot_segment_count.checked_sub(1).unwrap_or(0);
+
+            if self.dot_segment_count < self.leading_dot_segment_count {
+                self.leading_dot_segment_count -= 1;
+            }
+        }
+
+        if !segment.is_normalized() {
+            self.unnormalized_count = self.unnormalized_count.checked_sub(1).unwrap_or(0);
         }
 
         if self.segments.is_empty() {
@@ -263,6 +304,14 @@ impl<'path> Path<'path> {
         InvalidPath: From<SegmentError>,
     {
         let segment = Segment::try_from(segment)?;
+
+        if segment.is_dot_segment() {
+            if self.segments.len() == self.dot_segment_count {
+                self.leading_dot_segment_count += 1;
+            }
+
+            self.dot_segment_count += 1;
+        }
 
         if !segment.is_normalized() {
             self.unnormalized_count += 1;
@@ -337,6 +386,8 @@ impl<'path> Path<'path> {
             new_length = 1;
         }
 
+        self.dot_segment_count = 0;
+        self.leading_dot_segment_count = 0;
         self.segments.truncate(new_length);
     }
 
@@ -416,6 +467,8 @@ impl<'path> Path<'path> {
 
         Path {
             absolute: self.absolute,
+            dot_segment_count: self.dot_segment_count,
+            leading_dot_segment_count: self.leading_dot_segment_count,
             segments,
             unnormalized_count: self.unnormalized_count,
         }
@@ -625,6 +678,10 @@ impl Segment<'_> {
         }
     }
 
+    pub fn is_dot_segment(&self) -> bool {
+        self.as_str() == "." || self.as_str() == ".."
+    }
+
     pub fn is_normalized(&self) -> bool {
         self.normalized
     }
@@ -821,11 +878,24 @@ pub(crate) fn parse_path<'path>(
 ) -> Result<(Path<'path>, &'path [u8]), InvalidPath> {
     fn new_segment<'segment>(
         segment: &'segment [u8],
+        index: usize,
         normalized: bool,
         unnormalized_count: &mut usize,
+        dot_segment_count: &mut usize,
+        leading_dot_segment_count: &mut usize,
+        last_dot_segment: &mut Option<usize>,
     ) -> Segment<'segment> {
         if !normalized {
             *unnormalized_count += 1;
+        }
+
+        if segment == b"." || segment == b".." {
+            *dot_segment_count += 1;
+
+            if index == 0 || *last_dot_segment == Some(index - 1) {
+                *leading_dot_segment_count += 1;
+                *last_dot_segment = Some(index);
+            }
         }
 
         // Unsafe: The loop below makes sure this is safe.
@@ -843,6 +913,10 @@ pub(crate) fn parse_path<'path>(
     };
 
     let mut bytes = value.iter();
+    let mut dot_segment_count = 0;
+    let mut index = 0;
+    let mut last_dot_segment = None;
+    let mut leading_dot_segment_count = 0;
     let mut normalized = true;
     let mut unnormalized_count = 0;
     let mut segment_end_index = 0;
@@ -856,12 +930,18 @@ pub(crate) fn parse_path<'path>(
             0 if byte == b'?' || byte == b'#' => {
                 let segment = new_segment(
                     &value[segment_start_index..segment_end_index],
+                    index,
                     normalized,
                     &mut unnormalized_count,
+                    &mut dot_segment_count,
+                    &mut leading_dot_segment_count,
+                    &mut last_dot_segment,
                 );
                 segments.push(segment);
                 let path = Path {
                     absolute,
+                    dot_segment_count,
+                    leading_dot_segment_count,
                     segments,
                     unnormalized_count,
                 };
@@ -871,12 +951,17 @@ pub(crate) fn parse_path<'path>(
             0 if byte == b'/' => {
                 let segment = new_segment(
                     &value[segment_start_index..segment_end_index],
+                    index,
                     normalized,
                     &mut unnormalized_count,
+                    &mut dot_segment_count,
+                    &mut leading_dot_segment_count,
+                    &mut last_dot_segment,
                 );
                 segments.push(segment);
                 segment_end_index += 1;
                 segment_start_index = segment_end_index;
+                index += 1;
                 normalized = true;
             }
             0 => return Err(InvalidPath::InvalidCharacter),
@@ -896,13 +981,19 @@ pub(crate) fn parse_path<'path>(
 
     let segment = new_segment(
         &value[segment_start_index..],
+        index,
         normalized,
         &mut unnormalized_count,
+        &mut dot_segment_count,
+        &mut leading_dot_segment_count,
+        &mut last_dot_segment,
     );
     segments.push(segment);
 
     let path = Path {
         absolute,
+        dot_segment_count,
+        leading_dot_segment_count,
         segments,
         unnormalized_count,
     };
@@ -918,7 +1009,15 @@ mod test {
         fn test_case(value: &str, expected: &str, as_reference: bool) {
             let mut path = Path::try_from(value).unwrap();
             path.normalize(as_reference);
+
+            let expected_dot_segment_count = expected
+                .split('/')
+                .filter(|&segment| segment == "." || segment == "..")
+                .count();
+
             assert!(!path.segments().is_empty());
+            assert_eq!(path.dot_segment_count(), expected_dot_segment_count);
+            assert_eq!(path.leading_dot_segment_count(), expected_dot_segment_count);
             assert_eq!(path.to_string(), expected);
         }
 
@@ -975,6 +1074,8 @@ mod test {
             let mut path = Path::try_from(value).unwrap();
             path.remove_dot_segments();
             assert!(!path.segments().is_empty());
+            assert_eq!(path.dot_segment_count(), 0);
+            assert_eq!(path.leading_dot_segment_count(), 0);
             assert_eq!(path.to_string(), expected);
         }
 
