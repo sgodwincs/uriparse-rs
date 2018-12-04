@@ -253,6 +253,7 @@ impl<'fragment> TryFrom<&'fragment str> for Fragment<'fragment> {
 
 /// An error representing an invalid fragment.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum InvalidFragment {
     /// The fragment contained an invalid character.
     InvalidCharacter,

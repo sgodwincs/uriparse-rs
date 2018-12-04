@@ -1131,6 +1131,7 @@ impl<'uri> URIBuilder<'uri> {
 
 /// An error representing an invalid URI.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum InvalidURI {
     /// Represents the case when there is no authority, but the first path segment starts with
     /// `"//"`. This is not allowed because it would be interpreted as an authority component.

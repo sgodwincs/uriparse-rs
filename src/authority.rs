@@ -1374,6 +1374,7 @@ impl<'username> TryFrom<&'username str> for Username<'username> {
 
 /// An error representing an invalid authority.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum InvalidAuthority {
     /// This error occurs when the string from which the authority is parsed is not entirely
     /// consumed during the parsing. For example, parsing the string `"example.com/"` would generate
@@ -1437,6 +1438,7 @@ impl From<InvalidUserInfo> for InvalidAuthority {
 
 /// An error representing an invalid host.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum InvalidHost {
     /// The syntax for a future IP literal was used and is not currently supported.
     AddressMechanismNotSupported,
@@ -1481,6 +1483,7 @@ impl Error for InvalidHost {
 
 /// An error representing an invalid port.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum InvalidPort {
     /// An invalid character was used in the port. Only decimal digits are allowed.
     InvalidCharacter,
@@ -1528,6 +1531,7 @@ impl Error for InvalidRegisteredName {
 
 /// An error representing an invalid user information component.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum InvalidUserInfo {
     /// The user information contained an invalid character.
     InvalidCharacter,

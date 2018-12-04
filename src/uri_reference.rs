@@ -1338,6 +1338,7 @@ impl<'uri> URIReferenceBuilder<'uri> {
 
 /// An error representing an invalid URI reference.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum InvalidURIReference {
     /// Represents the case when there is no authority, but the first path segment starts with
     /// `"//"`. This is not allowed because it would be interpreted as an authority component.
@@ -1455,12 +1456,14 @@ fn validate_schemeless_path(
     authority: Option<&Authority>,
     path: &Path,
 ) -> Result<(), InvalidURIReference> {
-    if scheme.is_some() || authority.is_some() || !path
-        .segments()
-        .first()
-        .unwrap()
-        .bytes()
-        .any(|byte| byte == b':')
+    if scheme.is_some()
+        || authority.is_some()
+        || !path
+            .segments()
+            .first()
+            .unwrap()
+            .bytes()
+            .any(|byte| byte == b':')
     {
         Ok(())
     } else {

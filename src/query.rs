@@ -238,6 +238,7 @@ impl<'query> TryFrom<&'query str> for Query<'query> {
 
 /// An error representing an invalid query.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum InvalidQuery {
     /// This error occurs when the string from which the query is parsed is not entirely consumed
     /// during the parsing. For example, parsing the string `"my=query#fragment"` would generate

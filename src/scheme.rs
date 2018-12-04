@@ -406,6 +406,7 @@ impl<'scheme> TryFrom<&'scheme str> for UnregisteredScheme<'scheme> {
 
 /// An error representing an invalid scheme.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum InvalidScheme {
     /// The scheme component was empty.
     CannotBeEmpty,
