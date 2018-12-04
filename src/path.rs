@@ -50,14 +50,16 @@ pub struct Path<'path> {
     /// `'/'`.
     absolute: bool,
 
-    dot_segment_count: usize,
+    double_dot_segment_count: u16,
 
-    leading_dot_segment_count: usize,
+    leading_double_dot_segment_count: u16,
 
     /// The sequence of segments that compose the path.
     segments: Vec<Segment<'path>>,
 
-    unnormalized_count: usize,
+    single_dot_segment_count: u16,
+
+    unnormalized_count: u16,
 }
 
 impl<'path> Path<'path> {
@@ -82,10 +84,6 @@ impl<'path> Path<'path> {
         self.segments.push(Segment::empty());
     }
 
-    pub fn dot_segment_count(&self) -> usize {
-        self.dot_segment_count
-    }
-
     /// Converts the [`Path`] into an owned copy.
     ///
     /// If you construct the path from a source with a non-static lifetime, you may run into
@@ -103,9 +101,10 @@ impl<'path> Path<'path> {
 
         Path {
             absolute: self.absolute,
-            dot_segment_count: self.dot_segment_count,
-            leading_dot_segment_count: self.leading_dot_segment_count,
+            double_dot_segment_count: self.double_dot_segment_count,
+            leading_double_dot_segment_count: self.leading_double_dot_segment_count,
             segments,
+            single_dot_segment_count: self.single_dot_segment_count,
             unnormalized_count: self.unnormalized_count,
         }
     }
@@ -130,8 +129,21 @@ impl<'path> Path<'path> {
         self.absolute
     }
 
-    pub fn is_normalized(&self) -> bool {
-        self.unnormalized_count == 0 && self.dot_segment_count == self.leading_dot_segment_count
+    pub fn is_normalized(&self, as_reference: bool) -> bool {
+        if self.unnormalized_count != 0 {
+            return false;
+        }
+
+        if self.absolute || !as_reference {
+            self.single_dot_segment_count == 0 && self.double_dot_segment_count == 0
+        } else {
+            (self.single_dot_segment_count == 0
+                || (self.single_dot_segment_count == 1
+                    && self.segments[0].is_single_dot_segment()
+                    && self.segments.len() > 1
+                    && self.segments[1].contains(':')))
+                && self.double_dot_segment_count == self.leading_double_dot_segment_count
+        }
     }
 
     /// Returns whether or not the path is relative (i.e. it does not start with a `'/'`).
@@ -154,10 +166,6 @@ impl<'path> Path<'path> {
         !self.absolute
     }
 
-    pub fn leading_dot_segment_count(&self) -> usize {
-        self.leading_dot_segment_count
-    }
-
     /// Creates a path with no segments on it.
     ///
     /// This is only used to avoid allocations for temporary paths. Any path created using this
@@ -165,15 +173,16 @@ impl<'path> Path<'path> {
     pub(crate) unsafe fn new_with_no_segments(absolute: bool) -> Path<'static> {
         Path {
             absolute: absolute,
-            dot_segment_count: 0,
-            leading_dot_segment_count: 0,
+            double_dot_segment_count: 0,
+            leading_double_dot_segment_count: 0,
             segments: Vec::new(),
+            single_dot_segment_count: 0,
             unnormalized_count: 0,
         }
     }
 
     pub fn normalize(&mut self, as_reference: bool) {
-        if self.is_normalized() {
+        if self.is_normalized(as_reference) {
             return;
         }
 
@@ -184,25 +193,22 @@ impl<'path> Path<'path> {
             return;
         }
 
-        let mut dot_segment_count = 0;
+        let mut double_dot_segment_count = 0;
         let mut last_dot_segment = None;
         let mut new_length = 0;
 
         for i in 0..self.segments.len() {
-            let segment = self.segments[i].as_str();
+            let segment = &self.segments[i];
 
-            if segment == "." {
-                if new_length > 0
+            if segment.is_single_dot_segment()
+                && (new_length > 0
                     || i == self.segments.len() - 1
-                    || !self.segments[i + 1].as_str().contains(':')
-                {
-                    continue;
-                }
-
-                dot_segment_count += 1;
+                    || !self.segments[i + 1].as_str().contains(':'))
+            {
+                continue;
             }
 
-            if segment == ".." {
+            if segment.is_double_dot_segment() {
                 match last_dot_segment {
                     None if new_length == 0 => (),
                     Some(index) if index == new_length - 1 => (),
@@ -212,7 +218,7 @@ impl<'path> Path<'path> {
                     }
                 }
 
-                dot_segment_count += 1;
+                double_dot_segment_count += 1;
                 last_dot_segment = Some(new_length);
             }
 
@@ -226,8 +232,14 @@ impl<'path> Path<'path> {
             new_length = 1;
         }
 
-        self.dot_segment_count = dot_segment_count;
-        self.leading_dot_segment_count = dot_segment_count;
+        self.double_dot_segment_count = double_dot_segment_count;
+        self.leading_double_dot_segment_count = double_dot_segment_count;
+        self.single_dot_segment_count = if self.segments[0].as_str() == "." {
+            1
+        } else {
+            0
+        };
+
         self.segments.truncate(new_length);
     }
 
@@ -251,11 +263,17 @@ impl<'path> Path<'path> {
     pub fn pop(&mut self) {
         let segment = self.segments.pop().unwrap();
 
-        if segment.is_dot_segment() {
-            self.dot_segment_count = self.dot_segment_count.checked_sub(1).unwrap_or(0);
+        if segment.is_single_dot_segment() {
+            self.single_dot_segment_count =
+                self.single_dot_segment_count.checked_sub(1).unwrap_or(0);
+        }
 
-            if self.dot_segment_count < self.leading_dot_segment_count {
-                self.leading_dot_segment_count -= 1;
+        if segment.is_double_dot_segment() {
+            self.double_dot_segment_count =
+                self.double_dot_segment_count.checked_sub(1).unwrap_or(0);
+
+            if self.double_dot_segment_count < self.leading_double_dot_segment_count {
+                self.leading_double_dot_segment_count -= 1;
             }
         }
 
@@ -303,14 +321,22 @@ impl<'path> Path<'path> {
         Segment<'path>: TryFrom<SegmentType, Error = SegmentError>,
         InvalidPath: From<SegmentError>,
     {
+        if self.segments.len() as u16 == u16::max_value() {
+            return Err(InvalidPath::ExceededMaximumLength);
+        }
+
         let segment = Segment::try_from(segment)?;
 
-        if segment.is_dot_segment() {
-            if self.segments.len() == self.dot_segment_count {
-                self.leading_dot_segment_count += 1;
+        if segment.is_single_dot_segment() {
+            self.single_dot_segment_count += 1;
+        }
+
+        if segment.is_double_dot_segment() {
+            if self.segments.len() as u16 == self.double_dot_segment_count {
+                self.leading_double_dot_segment_count += 1;
             }
 
-            self.dot_segment_count += 1;
+            self.double_dot_segment_count += 1;
         }
 
         if !segment.is_normalized() {
@@ -386,8 +412,9 @@ impl<'path> Path<'path> {
             new_length = 1;
         }
 
-        self.dot_segment_count = 0;
-        self.leading_dot_segment_count = 0;
+        self.double_dot_segment_count = 0;
+        self.leading_double_dot_segment_count = 0;
+        self.single_dot_segment_count = 0;
         self.segments.truncate(new_length);
     }
 
@@ -467,9 +494,10 @@ impl<'path> Path<'path> {
 
         Path {
             absolute: self.absolute,
-            dot_segment_count: self.dot_segment_count,
-            leading_dot_segment_count: self.leading_dot_segment_count,
+            double_dot_segment_count: self.double_dot_segment_count,
+            leading_double_dot_segment_count: self.leading_double_dot_segment_count,
             segments,
+            single_dot_segment_count: self.single_dot_segment_count,
             unnormalized_count: self.unnormalized_count,
         }
     }
@@ -682,8 +710,16 @@ impl Segment<'_> {
         self.as_str() == "." || self.as_str() == ".."
     }
 
+    pub fn is_double_dot_segment(&self) -> bool {
+        self.as_str() == ".."
+    }
+
     pub fn is_normalized(&self) -> bool {
         self.normalized
+    }
+
+    pub fn is_single_dot_segment(&self) -> bool {
+        self.as_str() == "."
     }
 
     pub fn normalize(&mut self) {
@@ -833,7 +869,10 @@ impl<'segment> TryFrom<&'segment str> for Segment<'segment> {
 
 /// An error representing an invalid path.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum InvalidPath {
+    ExceededMaximumLength,
+
     /// This error occurs when the string from which the path is parsed is not entirely consumed
     /// during the parsing. For example, parsing the string `"/my/path?query"` would generate
     /// this error since `"?query"` would still be left over.
@@ -859,6 +898,7 @@ impl Error for InvalidPath {
         use self::InvalidPath::*;
 
         match self {
+            ExceededMaximumLength => "exceeded maximum path length",
             ExpectedEOF => "expected EOF",
             InvalidCharacter => "invalid path character",
             InvalidPercentEncoding => "invalid path percent encoding",
@@ -878,23 +918,28 @@ pub(crate) fn parse_path<'path>(
 ) -> Result<(Path<'path>, &'path [u8]), InvalidPath> {
     fn new_segment<'segment>(
         segment: &'segment [u8],
-        index: usize,
+        index: u16,
         normalized: bool,
-        unnormalized_count: &mut usize,
-        dot_segment_count: &mut usize,
-        leading_dot_segment_count: &mut usize,
-        last_dot_segment: &mut Option<usize>,
+        unnormalized_count: &mut u16,
+        single_dot_segment_count: &mut u16,
+        double_dot_segment_count: &mut u16,
+        leading_double_dot_segment_count: &mut u16,
+        last_double_dot_segment: &mut Option<u16>,
     ) -> Segment<'segment> {
         if !normalized {
             *unnormalized_count += 1;
         }
 
-        if segment == b"." || segment == b".." {
-            *dot_segment_count += 1;
+        if segment == b"." {
+            *single_dot_segment_count += 1;
+        }
 
-            if index == 0 || *last_dot_segment == Some(index - 1) {
-                *leading_dot_segment_count += 1;
-                *last_dot_segment = Some(index);
+        if segment == b".." {
+            *double_dot_segment_count += 1;
+
+            if index == 0 || *last_double_dot_segment == Some(index - 1) {
+                *leading_double_dot_segment_count += 1;
+                *last_double_dot_segment = Some(index);
             }
         }
 
@@ -913,14 +958,15 @@ pub(crate) fn parse_path<'path>(
     };
 
     let mut bytes = value.iter();
-    let mut dot_segment_count = 0;
+    let mut double_dot_segment_count = 0;
     let mut index = 0;
-    let mut last_dot_segment = None;
-    let mut leading_dot_segment_count = 0;
+    let mut last_double_dot_segment = None;
+    let mut leading_double_dot_segment_count = 0;
     let mut normalized = true;
-    let mut unnormalized_count = 0;
     let mut segment_end_index = 0;
     let mut segment_start_index = 0;
+    let mut single_dot_segment_count = 0;
+    let mut unnormalized_count = 0;
 
     // Set some moderate initial capacity. This seems to help with performance a bit.
     let mut segments = Vec::with_capacity(10);
@@ -933,16 +979,18 @@ pub(crate) fn parse_path<'path>(
                     index,
                     normalized,
                     &mut unnormalized_count,
-                    &mut dot_segment_count,
-                    &mut leading_dot_segment_count,
-                    &mut last_dot_segment,
+                    &mut single_dot_segment_count,
+                    &mut double_dot_segment_count,
+                    &mut leading_double_dot_segment_count,
+                    &mut last_double_dot_segment,
                 );
                 segments.push(segment);
                 let path = Path {
                     absolute,
-                    dot_segment_count,
-                    leading_dot_segment_count,
+                    double_dot_segment_count,
+                    leading_double_dot_segment_count,
                     segments,
+                    single_dot_segment_count,
                     unnormalized_count,
                 };
 
@@ -954,14 +1002,17 @@ pub(crate) fn parse_path<'path>(
                     index,
                     normalized,
                     &mut unnormalized_count,
-                    &mut dot_segment_count,
-                    &mut leading_dot_segment_count,
-                    &mut last_dot_segment,
+                    &mut single_dot_segment_count,
+                    &mut double_dot_segment_count,
+                    &mut leading_double_dot_segment_count,
+                    &mut last_double_dot_segment,
                 );
                 segments.push(segment);
                 segment_end_index += 1;
                 segment_start_index = segment_end_index;
-                index += 1;
+                index = index
+                    .checked_add(1)
+                    .ok_or(InvalidPath::ExceededMaximumLength)?;
                 normalized = true;
             }
             0 => return Err(InvalidPath::InvalidCharacter),
@@ -984,17 +1035,19 @@ pub(crate) fn parse_path<'path>(
         index,
         normalized,
         &mut unnormalized_count,
-        &mut dot_segment_count,
-        &mut leading_dot_segment_count,
-        &mut last_dot_segment,
+        &mut single_dot_segment_count,
+        &mut double_dot_segment_count,
+        &mut leading_double_dot_segment_count,
+        &mut last_double_dot_segment,
     );
     segments.push(segment);
 
     let path = Path {
         absolute,
-        dot_segment_count,
-        leading_dot_segment_count,
+        double_dot_segment_count,
+        leading_double_dot_segment_count,
         segments,
+        single_dot_segment_count,
         unnormalized_count,
     };
     Ok((path, b""))
@@ -1010,14 +1063,26 @@ mod test {
             let mut path = Path::try_from(value).unwrap();
             path.normalize(as_reference);
 
-            let expected_dot_segment_count = expected
+            let expected_single_dot_segment_count = if expected.starts_with("./") { 1 } else { 0 };
+            let expected_double_dot_segment_count = expected
                 .split('/')
-                .filter(|&segment| segment == "." || segment == "..")
-                .count();
+                .filter(|&segment| segment == "..")
+                .count() as u16;
 
             assert!(!path.segments().is_empty());
-            assert_eq!(path.dot_segment_count(), expected_dot_segment_count);
-            assert_eq!(path.leading_dot_segment_count(), expected_dot_segment_count);
+            assert!(path.is_normalized(as_reference));
+            assert_eq!(
+                path.single_dot_segment_count,
+                expected_single_dot_segment_count
+            );
+            assert_eq!(
+                path.double_dot_segment_count,
+                expected_double_dot_segment_count
+            );
+            assert_eq!(
+                path.leading_double_dot_segment_count,
+                expected_double_dot_segment_count
+            );
             assert_eq!(path.to_string(), expected);
         }
 
@@ -1074,8 +1139,9 @@ mod test {
             let mut path = Path::try_from(value).unwrap();
             path.remove_dot_segments();
             assert!(!path.segments().is_empty());
-            assert_eq!(path.dot_segment_count(), 0);
-            assert_eq!(path.leading_dot_segment_count(), 0);
+            assert_eq!(path.single_dot_segment_count, 0);
+            assert_eq!(path.double_dot_segment_count, 0);
+            assert_eq!(path.leading_double_dot_segment_count, 0);
             assert_eq!(path.to_string(), expected);
         }
 
