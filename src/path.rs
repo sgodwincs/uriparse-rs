@@ -353,6 +353,10 @@ impl<'path> Path<'path> {
     }
 
     pub fn remove_dot_segments(&mut self) {
+        if self.single_dot_segment_count == 0 && self.double_dot_segment_count == 0 {
+            return;
+        }
+
         self.remove_dot_segments_helper(false);
     }
 
