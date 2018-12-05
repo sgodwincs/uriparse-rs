@@ -40,7 +40,10 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::ops::Deref;
 use std::str;
 
-use crate::utility::{percent_encoded_equality, percent_encoded_hash};
+use crate::utility::{
+    get_percent_encoded_value, normalize_string, percent_encoded_equality, percent_encoded_hash,
+    UNRESERVED_CHAR_MAP,
+};
 
 /// A map of byte characters that determines if a character is a valid IPv4 or registered name
 /// character.
@@ -360,7 +363,10 @@ impl<'authority> Authority<'authority> {
     where
         Mapper: FnOnce(Host<'authority>) -> Host<'authority>,
     {
-        let temp_host = Host::RegisteredName(RegisteredName(Cow::from("")));
+        let temp_host = Host::RegisteredName(RegisteredName {
+            normalized: true,
+            registered_name: Cow::from(""),
+        });
         let host = mapper(mem::replace(&mut self.host, temp_host));
         self.set_host(host)
             .expect("mapped host resulted in invalid state")
@@ -435,6 +441,18 @@ impl<'authority> Authority<'authority> {
         let username = mapper(self.username.take());
         self.set_username(username)
             .expect("mapped username resulted in invalid state")
+    }
+
+    pub fn normalize(&mut self) {
+        if let Some(username) = self.username.as_mut() {
+            username.normalize();
+        }
+
+        if let Some(password) = self.password.as_mut() {
+            password.normalize();
+        }
+
+        self.host.normalize();
     }
 
     /// The password component of the authority as defined in
@@ -546,7 +564,10 @@ impl<'authority> Authority<'authority> {
                 let password = Password::try_from(password)?;
 
                 if self.username.is_none() {
-                    self.username = Some(Username(Cow::from("")));
+                    self.username = Some(Username {
+                        normalized: true,
+                        username: Cow::from(""),
+                    });
                 }
 
                 Some(password)
@@ -770,6 +791,13 @@ impl Host<'_> {
         }
     }
 
+    pub fn is_normalized(&self) -> bool {
+        match self {
+            Host::RegisteredName(name) => name.is_normalized(),
+            _ => true,
+        }
+    }
+
     /// Returns whether or not the host is a registered name.
     ///
     /// # Examples
@@ -788,6 +816,13 @@ impl Host<'_> {
         match self {
             Host::RegisteredName(_) => true,
             _ => false,
+        }
+    }
+
+    pub fn normalize(&mut self) {
+        match self {
+            Host::RegisteredName(name) => name.normalize(),
+            _ => (),
         }
     }
 }
@@ -840,7 +875,11 @@ impl<'host> TryFrom<&'host [u8]> for Host<'host> {
 
     fn try_from(value: &'host [u8]) -> Result<Self, Self::Error> {
         if value.is_empty() {
-            return Ok(Host::RegisteredName(RegisteredName(Cow::from(""))));
+            let registered_name = RegisteredName {
+                normalized: true,
+                registered_name: Cow::from(""),
+            };
+            return Ok(Host::RegisteredName(registered_name));
         }
 
         match (value.get(0), value.get(value.len() - 1)) {
@@ -879,7 +918,9 @@ impl<'host> TryFrom<&'host [u8]> for Host<'host> {
                 Ok(Host::IPv6Address(ipv6))
             }
             _ => {
-                if check_ipv4_or_registered_name(value) {
+                let (valid, normalized) = check_ipv4_or_registered_name(value);
+
+                if valid {
                     match unsafe { str::from_utf8_unchecked(value) }.parse() {
                         Ok(ipv4) => Ok(Host::IPv4Address(ipv4)),
                         Err(_) => {
@@ -887,7 +928,10 @@ impl<'host> TryFrom<&'host [u8]> for Host<'host> {
                             // this is valid ASCII implying valid UTF-8.
 
                             let name = unsafe { str::from_utf8_unchecked(value) };
-                            Ok(Host::RegisteredName(RegisteredName(Cow::from(name))))
+                            Ok(Host::RegisteredName(RegisteredName {
+                                normalized,
+                                registered_name: Cow::from(name),
+                            }))
                         }
                     }
                 } else {
@@ -921,18 +965,24 @@ impl<'host> TryFrom<&'host str> for Host<'host> {
 /// is with no normalization performed. You should perform percent-encoding normalization if you
 /// want to use the password for any sort of authentication (not recommended).
 #[derive(Clone, Debug)]
-pub struct Password<'password>(Cow<'password, str>);
+pub struct Password<'password> {
+    normalized: bool,
+    password: Cow<'password, str>,
+}
 
 impl Password<'_> {
     pub fn as_borrowed(&self) -> Password {
         use self::Cow::*;
 
-        let password = match &self.0 {
+        let password = match &self.password {
             Borrowed(borrowed) => *borrowed,
             Owned(owned) => owned.as_str(),
         };
 
-        Password(Cow::Borrowed(password))
+        Password {
+            normalized: self.normalized,
+            password: Cow::Borrowed(password),
+        }
     }
 
     /// Returns a `str` representation of the password.
@@ -950,7 +1000,7 @@ impl Password<'_> {
     /// assert_eq!(password, "password");
     /// ```
     pub fn as_str(&self) -> &str {
-        &self.0
+        &self.password
     }
 
     /// Converts the [`Password`] into an owned copy.
@@ -962,19 +1012,33 @@ impl Password<'_> {
     /// This is different from just cloning. Cloning the password will just copy the references, and
     /// thus the lifetime will remain the same.
     pub fn into_owned(self) -> Password<'static> {
-        Password(Cow::from(self.0.into_owned()))
+        Password {
+            normalized: self.normalized,
+            password: Cow::from(self.password.into_owned()),
+        }
+    }
+
+    pub fn is_normalized(&self) -> bool {
+        self.normalized
+    }
+
+    pub fn normalize(&mut self) {
+        if !self.normalized {
+            normalize_string(&mut self.password.to_mut());
+            self.normalized = true;
+        }
     }
 }
 
 impl AsRef<[u8]> for Password<'_> {
     fn as_ref(&self) -> &[u8] {
-        self.0.as_bytes()
+        self.password.as_bytes()
     }
 }
 
 impl AsRef<str> for Password<'_> {
     fn as_ref(&self) -> &str {
-        &self.0
+        &self.password
     }
 }
 
@@ -982,13 +1046,13 @@ impl Deref for Password<'_> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.password
     }
 }
 
 impl Display for Password<'_> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        formatter.write_str(&self.0)
+        formatter.write_str(&self.password)
     }
 }
 
@@ -1005,61 +1069,61 @@ impl Hash for Password<'_> {
     where
         H: Hasher,
     {
-        percent_encoded_hash(self.0.as_bytes(), state, true);
+        percent_encoded_hash(self.password.as_bytes(), state, true);
     }
 }
 
 impl PartialEq for Password<'_> {
     fn eq(&self, other: &Password) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other.0.as_bytes(), true)
+        percent_encoded_equality(self.password.as_bytes(), other.password.as_bytes(), true)
     }
 }
 
 impl PartialEq<[u8]> for Password<'_> {
     fn eq(&self, other: &[u8]) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other, true)
+        percent_encoded_equality(self.password.as_bytes(), other, true)
     }
 }
 
 impl<'password> PartialEq<Password<'password>> for [u8] {
     fn eq(&self, other: &Password<'password>) -> bool {
-        percent_encoded_equality(self, other.0.as_bytes(), true)
+        percent_encoded_equality(self, other.password.as_bytes(), true)
     }
 }
 
 impl<'a> PartialEq<&'a [u8]> for Password<'_> {
     fn eq(&self, other: &&'a [u8]) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other, true)
+        percent_encoded_equality(self.password.as_bytes(), other, true)
     }
 }
 
 impl<'a, 'password> PartialEq<Password<'password>> for &'a [u8] {
     fn eq(&self, other: &Password<'password>) -> bool {
-        percent_encoded_equality(self, other.0.as_bytes(), true)
+        percent_encoded_equality(self, other.password.as_bytes(), true)
     }
 }
 
 impl PartialEq<str> for Password<'_> {
     fn eq(&self, other: &str) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), true)
+        percent_encoded_equality(self.password.as_bytes(), other.as_bytes(), true)
     }
 }
 
 impl<'password> PartialEq<Password<'password>> for str {
     fn eq(&self, other: &Password<'password>) -> bool {
-        percent_encoded_equality(self.as_bytes(), other.0.as_bytes(), true)
+        percent_encoded_equality(self.as_bytes(), other.password.as_bytes(), true)
     }
 }
 
 impl<'a> PartialEq<&'a str> for Password<'_> {
     fn eq(&self, other: &&'a str) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), true)
+        percent_encoded_equality(self.password.as_bytes(), other.as_bytes(), true)
     }
 }
 
 impl<'a, 'password> PartialEq<Password<'password>> for &'a str {
     fn eq(&self, other: &Password<'password>) -> bool {
-        percent_encoded_equality(self.as_bytes(), other.0.as_bytes(), true)
+        percent_encoded_equality(self.as_bytes(), other.password.as_bytes(), true)
     }
 }
 
@@ -1067,9 +1131,11 @@ impl<'password> TryFrom<&'password [u8]> for Password<'password> {
     type Error = InvalidUserInfo;
 
     fn try_from(value: &'password [u8]) -> Result<Self, Self::Error> {
-        check_user_info(value)?;
-        let password = Password(Cow::from(unsafe { str::from_utf8_unchecked(value) }));
-        Ok(password)
+        let normalized = check_user_info(value, false)?;
+        Ok(Password {
+            normalized,
+            password: Cow::from(unsafe { str::from_utf8_unchecked(value) }),
+        })
     }
 }
 
@@ -1092,44 +1158,64 @@ impl<'password> TryFrom<&'password str> for Password<'password> {
 /// mean that the host is normalized. The original host string will always be preserved as is with
 /// no normalization performed.
 #[derive(Clone, Debug)]
-pub struct RegisteredName<'name>(Cow<'name, str>);
+pub struct RegisteredName<'name> {
+    normalized: bool,
+    registered_name: Cow<'name, str>,
+}
 
 impl RegisteredName<'_> {
     pub fn as_borrowed(&self) -> RegisteredName {
         use self::Cow::*;
 
-        let name = match &self.0 {
+        let name = match &self.registered_name {
             Borrowed(borrowed) => *borrowed,
             Owned(owned) => owned.as_str(),
         };
 
-        RegisteredName(Cow::Borrowed(name))
+        RegisteredName {
+            normalized: self.normalized,
+            registered_name: Cow::Borrowed(name),
+        }
     }
 
     pub fn as_str(&self) -> &str {
-        &self.0
+        &self.registered_name
     }
 
     pub fn into_owned(self) -> RegisteredName<'static> {
-        RegisteredName(Cow::from(self.0.into_owned()))
+        RegisteredName {
+            normalized: self.normalized,
+            registered_name: Cow::from(self.registered_name.into_owned()),
+        }
+    }
+
+    pub fn is_normalized(&self) -> bool {
+        self.normalized
+    }
+
+    pub fn normalize(&mut self) {
+        if !self.normalized {
+            normalize_string(&mut self.registered_name.to_mut());
+            self.normalized = true;
+        }
     }
 }
 
 impl AsRef<[u8]> for RegisteredName<'_> {
     fn as_ref(&self) -> &[u8] {
-        self.0.as_bytes()
+        self.registered_name.as_bytes()
     }
 }
 
 impl AsRef<str> for RegisteredName<'_> {
     fn as_ref(&self) -> &str {
-        &self.0
+        &self.registered_name
     }
 }
 
 impl Display for RegisteredName<'_> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        formatter.write_str(&self.0)
+        formatter.write_str(&self.registered_name)
     }
 }
 
@@ -1146,61 +1232,65 @@ impl Hash for RegisteredName<'_> {
     where
         H: Hasher,
     {
-        percent_encoded_hash(self.0.as_bytes(), state, false);
+        percent_encoded_hash(self.registered_name.as_bytes(), state, false);
     }
 }
 
 impl PartialEq for RegisteredName<'_> {
     fn eq(&self, other: &RegisteredName) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other.0.as_bytes(), false)
+        percent_encoded_equality(
+            self.registered_name.as_bytes(),
+            other.registered_name.as_bytes(),
+            false,
+        )
     }
 }
 
 impl PartialEq<[u8]> for RegisteredName<'_> {
     fn eq(&self, other: &[u8]) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other, false)
+        percent_encoded_equality(self.registered_name.as_bytes(), other, false)
     }
 }
 
 impl<'name> PartialEq<RegisteredName<'name>> for [u8] {
     fn eq(&self, other: &RegisteredName<'name>) -> bool {
-        percent_encoded_equality(self, other.0.as_bytes(), false)
+        percent_encoded_equality(self, other.registered_name.as_bytes(), false)
     }
 }
 
 impl<'a> PartialEq<&'a [u8]> for RegisteredName<'_> {
     fn eq(&self, other: &&'a [u8]) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other, false)
+        percent_encoded_equality(self.registered_name.as_bytes(), other, false)
     }
 }
 
 impl<'a, 'name> PartialEq<RegisteredName<'name>> for &'a [u8] {
     fn eq(&self, other: &RegisteredName<'name>) -> bool {
-        percent_encoded_equality(self, other.0.as_bytes(), false)
+        percent_encoded_equality(self, other.registered_name.as_bytes(), false)
     }
 }
 
 impl PartialEq<str> for RegisteredName<'_> {
     fn eq(&self, other: &str) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), false)
+        percent_encoded_equality(self.registered_name.as_bytes(), other.as_bytes(), false)
     }
 }
 
 impl<'name> PartialEq<RegisteredName<'name>> for str {
     fn eq(&self, other: &RegisteredName<'name>) -> bool {
-        percent_encoded_equality(self.as_bytes(), other.0.as_bytes(), false)
+        percent_encoded_equality(self.as_bytes(), other.registered_name.as_bytes(), false)
     }
 }
 
 impl<'a> PartialEq<&'a str> for RegisteredName<'_> {
     fn eq(&self, other: &&'a str) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), false)
+        percent_encoded_equality(self.registered_name.as_bytes(), other.as_bytes(), false)
     }
 }
 
 impl<'a, 'name> PartialEq<RegisteredName<'name>> for &'a str {
     fn eq(&self, other: &RegisteredName<'name>) -> bool {
-        percent_encoded_equality(self.as_bytes(), other.0.as_bytes(), false)
+        percent_encoded_equality(self.as_bytes(), other.registered_name.as_bytes(), false)
     }
 }
 
@@ -1234,38 +1324,54 @@ impl<'name> TryFrom<&'name str> for RegisteredName<'name> {
 /// mean that the username is normalized. The original username string will always be preserved as
 /// is with no normalization performed.
 #[derive(Clone, Debug)]
-pub struct Username<'username>(Cow<'username, str>);
+pub struct Username<'username> {
+    normalized: bool,
+    username: Cow<'username, str>,
+}
 
 impl Username<'_> {
     pub fn as_borrowed(&self) -> Username {
         use self::Cow::*;
 
-        let username = match &self.0 {
+        let username = match &self.username {
             Borrowed(borrowed) => *borrowed,
             Owned(owned) => owned.as_str(),
         };
 
-        Username(Cow::Borrowed(username))
+        Username {
+            normalized: self.normalized,
+            username: Cow::Borrowed(username),
+        }
     }
 
     pub fn as_str(&self) -> &str {
-        &self.0
+        &self.username
     }
 
     pub fn into_owned(self) -> Username<'static> {
-        Username(Cow::from(self.0.into_owned()))
+        Username {
+            normalized: self.normalized,
+            username: Cow::from(self.username.into_owned()),
+        }
+    }
+
+    pub fn normalize(&mut self) {
+        if !self.normalized {
+            normalize_string(&mut self.username.to_mut());
+            self.normalized = true;
+        }
     }
 }
 
 impl AsRef<[u8]> for Username<'_> {
     fn as_ref(&self) -> &[u8] {
-        self.0.as_bytes()
+        self.username.as_bytes()
     }
 }
 
 impl AsRef<str> for Username<'_> {
     fn as_ref(&self) -> &str {
-        &self.0
+        &self.username
     }
 }
 
@@ -1273,13 +1379,13 @@ impl Deref for Username<'_> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.username
     }
 }
 
 impl Display for Username<'_> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        formatter.write_str(&self.0)
+        formatter.write_str(&self.username)
     }
 }
 
@@ -1296,19 +1402,19 @@ impl Hash for Username<'_> {
     where
         H: Hasher,
     {
-        percent_encoded_hash(self.0.as_bytes(), state, true);
+        percent_encoded_hash(self.username.as_bytes(), state, true);
     }
 }
 
 impl PartialEq for Username<'_> {
     fn eq(&self, other: &Username) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other.0.as_bytes(), true)
+        percent_encoded_equality(self.username.as_bytes(), other.username.as_bytes(), true)
     }
 }
 
 impl PartialEq<[u8]> for Username<'_> {
     fn eq(&self, other: &[u8]) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other, true)
+        percent_encoded_equality(self.username.as_bytes(), other, true)
     }
 }
 
@@ -1320,7 +1426,7 @@ impl<'username> PartialEq<Username<'username>> for [u8] {
 
 impl<'a> PartialEq<&'a [u8]> for Username<'_> {
     fn eq(&self, other: &&'a [u8]) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other, true)
+        percent_encoded_equality(self.username.as_bytes(), other, true)
     }
 }
 
@@ -1332,25 +1438,25 @@ impl<'a, 'username> PartialEq<Username<'username>> for &'a [u8] {
 
 impl PartialEq<str> for Username<'_> {
     fn eq(&self, other: &str) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), true)
+        percent_encoded_equality(self.username.as_bytes(), other.as_bytes(), true)
     }
 }
 
 impl<'username> PartialEq<Username<'username>> for str {
     fn eq(&self, other: &Username<'username>) -> bool {
-        percent_encoded_equality(self.as_bytes(), other.0.as_bytes(), true)
+        percent_encoded_equality(self.as_bytes(), other.username.as_bytes(), true)
     }
 }
 
 impl<'a> PartialEq<&'a str> for Username<'_> {
     fn eq(&self, other: &&'a str) -> bool {
-        percent_encoded_equality(self.0.as_bytes(), other.as_bytes(), true)
+        percent_encoded_equality(self.username.as_bytes(), other.as_bytes(), true)
     }
 }
 
 impl<'a, 'username> PartialEq<Username<'username>> for &'a str {
     fn eq(&self, other: &Username<'username>) -> bool {
-        percent_encoded_equality(self.as_bytes(), other.0.as_bytes(), true)
+        percent_encoded_equality(self.as_bytes(), other.username.as_bytes(), true)
     }
 }
 
@@ -1358,9 +1464,11 @@ impl<'username> TryFrom<&'username [u8]> for Username<'username> {
     type Error = InvalidUserInfo;
 
     fn try_from(value: &'username [u8]) -> Result<Self, Self::Error> {
-        check_user_info(value)?;
-        let username = Username(Cow::from(unsafe { str::from_utf8_unchecked(value) }));
-        Ok(username)
+        let normalized = check_user_info(value, true)?;
+        Ok(Username {
+            normalized,
+            username: Cow::from(unsafe { str::from_utf8_unchecked(value) }),
+        })
     }
 }
 
@@ -1538,6 +1646,11 @@ pub enum InvalidUserInfo {
 
     /// The user information contained an invalid percent encoding (e.g. `"%ZZ"`).
     InvalidPercentEncoding,
+
+    /// The username contained a `':'` which is only to be used as a delimiter between the username
+    /// and password. This variant can only happen when trying to directly parse a username from a
+    /// byte source.
+    UsernameCannotContainColon,
 }
 
 impl Display for InvalidUserInfo {
@@ -1553,31 +1666,34 @@ impl Error for InvalidUserInfo {
         match self {
             InvalidCharacter => "invalid user info character",
             InvalidPercentEncoding => "invalid user info percent encoding",
+            UsernameCannotContainColon => "username cannot contain a colon character",
         }
     }
 }
 
 /// Returns true if the byte string contains only valid IPv4 or registered name characters. This
 /// also ensures that percent encodings are valid.
-fn check_ipv4_or_registered_name(value: &[u8]) -> bool {
+fn check_ipv4_or_registered_name(value: &[u8]) -> (bool, bool) {
     let mut bytes = value.iter();
+    let mut normalized = true;
 
     while let Some(&byte) = bytes.next() {
         match IPV4_AND_REGISTERED_NAME_CHAR_MAP[byte as usize] {
-            0 => return false,
-            b'%' => match (bytes.next(), bytes.next()) {
-                (Some(byte_1), Some(byte_2))
-                    if byte_1.is_ascii_hexdigit() && byte_2.is_ascii_hexdigit() =>
-                {
-                    ()
+            0 => return (false, false),
+            b'%' => match get_percent_encoded_value(bytes.next().cloned(), bytes.next().cloned()) {
+                Ok((hex_value, uppercase)) => {
+                    if !uppercase || UNRESERVED_CHAR_MAP[hex_value as usize] != 0 {
+                        normalized = false;
+                    }
                 }
-                _ => return false,
+                _ => return (false, false),
             },
+            b'A'..=b'Z' => normalized = false,
             _ => (),
         }
     }
 
-    true
+    (true, normalized)
 }
 
 /// Returns true if the byte string contains only valid IPv6 characters.
@@ -1606,31 +1722,27 @@ fn check_ipvfuture(value: &[u8]) -> bool {
 
 /// Checks if the user information component contains valid characters and percent encodings. If so,
 /// it will return an `Option<usize>` indicating the separator index for the username and password.
-fn check_user_info(value: &[u8]) -> Result<Option<usize>, InvalidUserInfo> {
-    let mut bytes = value.iter().enumerate();
-    let mut first_colon_index = None;
+fn check_user_info(value: &[u8], is_username: bool) -> Result<bool, InvalidUserInfo> {
+    let mut bytes = value.iter();
+    let mut normalized = true;
 
-    while let Some((index, &byte)) = bytes.next() {
+    while let Some(&byte) = bytes.next() {
         match USER_INFO_CHAR_MAP[byte as usize] {
             0 => return Err(InvalidUserInfo::InvalidCharacter),
-            b'%' => match (bytes.next(), bytes.next()) {
-                (Some((_, byte_1)), Some((_, byte_2)))
-                    if byte_1.is_ascii_hexdigit() && byte_2.is_ascii_hexdigit() =>
-                {
-                    ()
+            b'%' => match get_percent_encoded_value(bytes.next().cloned(), bytes.next().cloned()) {
+                Ok((hex_value, uppercase)) => {
+                    if !uppercase || UNRESERVED_CHAR_MAP[hex_value as usize] != 0 {
+                        normalized = false;
+                    }
                 }
-                _ => return Err(InvalidUserInfo::InvalidPercentEncoding),
+                Err(_) => return Err(InvalidUserInfo::InvalidPercentEncoding),
             },
-            b':' => {
-                if first_colon_index.is_none() {
-                    first_colon_index = Some(index);
-                }
-            }
+            b':' if is_username => return Err(InvalidUserInfo::UsernameCannotContainColon),
             _ => (),
         }
     }
 
-    Ok(first_colon_index)
+    Ok(normalized)
 }
 
 /// Parses the authority from the given byte string.
@@ -1714,17 +1826,26 @@ fn parse_user_info<'user_info>(
 ) -> Result<(Username<'user_info>, Option<Password<'user_info>>), InvalidUserInfo> {
     let mut bytes = value.iter().enumerate();
     let mut first_colon_index = None;
+    let mut password_normalized = true;
+    let mut username_normalized = true;
 
     while let Some((index, &byte)) = bytes.next() {
         match USER_INFO_CHAR_MAP[byte as usize] {
             0 => return Err(InvalidUserInfo::InvalidCharacter),
-            b'%' => match (bytes.next(), bytes.next()) {
-                (Some((_, byte_1)), Some((_, byte_2)))
-                    if byte_1.is_ascii_hexdigit() && byte_2.is_ascii_hexdigit() =>
-                {
-                    ()
+            b'%' => match get_percent_encoded_value(
+                bytes.next().map(|(_, &byte)| byte),
+                bytes.next().map(|(_, &byte)| byte),
+            ) {
+                Ok((hex_value, uppercase)) => {
+                    if !uppercase || UNRESERVED_CHAR_MAP[hex_value as usize] != 0 {
+                        if first_colon_index.is_some() {
+                            password_normalized = false;
+                        } else {
+                            username_normalized = false;
+                        }
+                    }
                 }
-                _ => return Err(InvalidUserInfo::InvalidPercentEncoding),
+                Err(_) => return Err(InvalidUserInfo::InvalidPercentEncoding),
             },
             b':' => {
                 if first_colon_index.is_none() {
@@ -1735,21 +1856,26 @@ fn parse_user_info<'user_info>(
         }
     }
 
-    // Unsafe: All uses of unsafe below have already been checked by [`check_user_info`] prior to
-    // calling this function.
+    // Unsafe: All characters are ASCII, as checked above.
 
     Ok(match first_colon_index {
         Some(index) => {
-            let username = unsafe { str::from_utf8_unchecked(&value[..index]) };
-            let password = unsafe { str::from_utf8_unchecked(&value[index + 1..]) };
-            (
-                Username(Cow::from(username)),
-                Some(Password(Cow::from(password))),
-            )
+            let username = Username {
+                normalized: username_normalized,
+                username: Cow::from(unsafe { str::from_utf8_unchecked(&value[..index]) }),
+            };
+            let password = Password {
+                normalized: password_normalized,
+                password: Cow::from(unsafe { str::from_utf8_unchecked(&value[index + 1..]) }),
+            };
+            (username, Some(password))
         }
         _ => {
-            let username = unsafe { str::from_utf8_unchecked(value) };
-            (Username(Cow::from(username)), None)
+            let username = Username {
+                normalized: username_normalized,
+                username: Cow::from(unsafe { str::from_utf8_unchecked(value) }),
+            };
+            (username, None)
         }
     })
 }
