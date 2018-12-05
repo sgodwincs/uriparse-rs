@@ -1024,7 +1024,7 @@ impl Password<'_> {
 
     pub fn normalize(&mut self) {
         if !self.normalized {
-            normalize_string(&mut self.password.to_mut());
+            normalize_string(&mut self.password.to_mut(), true);
             self.normalized = true;
         }
     }
@@ -1195,7 +1195,7 @@ impl RegisteredName<'_> {
 
     pub fn normalize(&mut self) {
         if !self.normalized {
-            normalize_string(&mut self.registered_name.to_mut());
+            normalize_string(&mut self.registered_name.to_mut(), false);
             self.normalized = true;
         }
     }
@@ -1357,7 +1357,7 @@ impl Username<'_> {
 
     pub fn normalize(&mut self) {
         if !self.normalized {
-            normalize_string(&mut self.username.to_mut());
+            normalize_string(&mut self.username.to_mut(), true);
             self.normalized = true;
         }
     }

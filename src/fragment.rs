@@ -107,7 +107,7 @@ impl Fragment<'_> {
 
     pub fn normalize(&mut self) {
         if !self.normalized {
-            normalize_string(&mut self.fragment.to_mut());
+            normalize_string(&mut self.fragment.to_mut(), true);
             self.normalized = true;
         }
     }
