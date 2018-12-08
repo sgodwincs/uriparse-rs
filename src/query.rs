@@ -295,6 +295,8 @@ pub(crate) fn parse_query<'query>(
                     if !uppercase || UNRESERVED_CHAR_MAP[hex_value as usize] != 0 {
                         normalized = false;
                     }
+
+                    end_index += 3;
                 }
                 Err(_) => return Err(InvalidQuery::InvalidPercentEncoding),
             },
