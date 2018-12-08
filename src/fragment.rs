@@ -49,7 +49,7 @@ const FRAGMENT_CHAR_MAP: [u8; 256] = [
 /// [`Fragment::normalize`] function.
 #[derive(Clone, Debug)]
 pub struct Fragment<'fragment> {
-    /// The internal fragment source that is either owened or borrowed.
+    /// The internal fragment source that is either owned or borrowed.
     fragment: Cow<'fragment, str>,
 
     /// Whether the fragment is normalized.
@@ -105,7 +105,7 @@ impl Fragment<'_> {
         }
     }
 
-    /// Returns whether the fragment is normalization.
+    /// Returns whether the fragment is normalized.
     ///
     /// A normalized fragment will have no bytes that are in the unreserved character set
     /// percent-encoded and all alphabetical characters in percent-encodings will be uppercase.
@@ -341,7 +341,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_normalize() {
+    fn test_fragment_normalize() {
         fn test_case(value: &str, expected: &str) {
             let mut fragment = Fragment::try_from(value).unwrap();
             fragment.normalize();
@@ -354,7 +354,7 @@ mod test {
     }
 
     #[test]
-    fn test_parse() {
+    fn test_fragment_parse() {
         use self::InvalidFragment::*;
 
         assert_eq!(Fragment::try_from("").unwrap(), "");

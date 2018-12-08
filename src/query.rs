@@ -56,12 +56,12 @@ pub struct Query<'query> {
     /// Whether the query is normalized.
     normalized: bool,
 
-    /// The internal query source that is either owened or borrowed.
+    /// The internal query source that is either owned or borrowed.
     query: Cow<'query, str>,
 }
 
 impl Query<'_> {
-    /// Returns a new query which is identical but has as lifetime tied to this fragment.
+    /// Returns a new query which is identical but has as lifetime tied to this query.
     pub fn as_borrowed(&self) -> Query {
         use self::Cow::*;
 
@@ -109,7 +109,7 @@ impl Query<'_> {
         }
     }
 
-    /// Returns whether the query is normalization.
+    /// Returns whether the query is normalized.
     ///
     /// A normalized query will have no bytes that are in the unreserved character set
     /// percent-encoded and all alphabetical characters in percent-encodings will be uppercase.
@@ -274,7 +274,7 @@ impl<'query> TryFrom<&'query [u8]> for Query<'query> {
         if rest.is_empty() {
             Ok(query)
         } else {
-            Err(InvalidQuery::ExpectedEOF)
+            Err(InvalidQuery::InvalidCharacter)
         }
     }
 }
@@ -291,13 +291,6 @@ impl<'query> TryFrom<&'query str> for Query<'query> {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum InvalidQuery {
-    /// This error occurs when the string from which the query is parsed is not entirely consumed
-    /// during the parsing. For example, parsing the string `"my=query#fragment"` would generate
-    /// this error since `"#fragment"` would still be left over.
-    ///
-    /// This only applies to the [`Query::try_from`] functions.
-    ExpectedEOF,
-
     /// The fragment contained an invalid character.
     InvalidCharacter,
 
@@ -316,7 +309,6 @@ impl Error for InvalidQuery {
         use self::InvalidQuery::*;
 
         match self {
-            ExpectedEOF => "expected EOF",
             InvalidCharacter => "invalid query character",
             InvalidPercentEncoding => "invalid query percent encoding",
         }
@@ -370,7 +362,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_normalize() {
+    fn test_query_normalize() {
         fn test_case(value: &str, expected: &str) {
             let mut query = Query::try_from(value).unwrap();
             query.normalize();
@@ -383,7 +375,7 @@ mod test {
     }
 
     #[test]
-    fn test_parse() {
+    fn test_query_parse() {
         use self::InvalidQuery::*;
 
         assert_eq!(Query::try_from("").unwrap(), "");
@@ -392,6 +384,7 @@ mod test {
         assert_eq!(Query::try_from("%ff%ff%ff%41").unwrap(), "%ff%ff%ff%41");
 
         assert_eq!(Query::try_from(" "), Err(InvalidCharacter));
+        assert_eq!(Query::try_from("#"), Err(InvalidCharacter));
         assert_eq!(Query::try_from("%"), Err(InvalidPercentEncoding));
         assert_eq!(Query::try_from("%f"), Err(InvalidPercentEncoding));
         assert_eq!(Query::try_from("%zz"), Err(InvalidPercentEncoding));
