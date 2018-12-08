@@ -624,7 +624,7 @@ impl<'path> TryFrom<&'path [u8]> for Path<'path> {
         if rest.is_empty() {
             Ok(path)
         } else {
-            Err(InvalidPath::ExpectedEOF)
+            Err(InvalidPath::InvalidCharacter)
         }
     }
 }
@@ -642,11 +642,15 @@ impl<'path> TryFrom<&'path str> for Path<'path> {
 /// Segments are separated from other segments with the `'/'` delimiter.
 #[derive(Clone, Debug)]
 pub struct Segment<'segment> {
+    /// Whether the segment is normalized.
     normalized: bool,
+
+    /// The internal segment source that is either owned or borrowed.
     segment: Cow<'segment, str>,
 }
 
 impl Segment<'_> {
+    /// Returns a new segment which is identical but has as lifetime tied to this segment.
     pub fn as_borrowed(&self) -> Segment {
         use self::Cow::*;
 
@@ -710,22 +714,129 @@ impl Segment<'_> {
         }
     }
 
+    /// Returns whether the segment is a dot segment, i.e., is `"."` or `".."`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Segment;
+    ///
+    /// let segment = Segment::try_from("segment").unwrap();
+    /// assert!(!segment.is_dot_segment());
+    ///
+    /// let segment = Segment::try_from(".").unwrap();
+    /// assert!(segment.is_dot_segment());
+    ///
+    /// let segment = Segment::try_from("..").unwrap();
+    /// assert!(segment.is_dot_segment());
+    /// ```
     pub fn is_dot_segment(&self) -> bool {
-        self.as_str() == "." || self.as_str() == ".."
+        self == "." || self == ".."
     }
 
+    /// Returns whether the segment is a dot segment, i.e., is `".."`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Segment;
+    ///
+    /// let segment = Segment::try_from("segment").unwrap();
+    /// assert!(!segment.is_double_dot_segment());
+    ///
+    /// let segment = Segment::try_from(".").unwrap();
+    /// assert!(!segment.is_double_dot_segment());
+    ///
+    /// let segment = Segment::try_from("..").unwrap();
+    /// assert!(segment.is_double_dot_segment());
+    /// ```
     pub fn is_double_dot_segment(&self) -> bool {
-        self.as_str() == ".."
+        self == ".."
     }
 
+    /// Returns whether the segment is normalized.
+    ///
+    /// A normalized segment will have no bytes that are in the unreserved character set
+    /// percent-encoded and all alphabetical characters in percent-encodings will be uppercase.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Segment;
+    ///
+    /// let segment = Segment::try_from("segment").unwrap();
+    /// assert!(segment.is_normalized());
+    ///
+    /// let mut segment = Segment::try_from("%ff%ff").unwrap();
+    /// assert!(!segment.is_normalized());
+    /// segment.normalize();
+    /// assert!(segment.is_normalized());
+    /// ```
     pub fn is_normalized(&self) -> bool {
         self.normalized
     }
 
+    /// Returns whether the segment is a dot segment, i.e., is `"."`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Segment;
+    ///
+    /// let segment = Segment::try_from("segment").unwrap();
+    /// assert!(!segment.is_single_dot_segment());
+    ///
+    /// let segment = Segment::try_from(".").unwrap();
+    /// assert!(segment.is_single_dot_segment());
+    ///
+    /// let segment = Segment::try_from("..").unwrap();
+    /// assert!(!segment.is_single_dot_segment());
+    /// ```
     pub fn is_single_dot_segment(&self) -> bool {
-        self.as_str() == "."
+        self == "."
     }
 
+    /// Normalizes the segment such that it will have no bytes that are in the unreserved character
+    /// set percent-encoded and all alphabetical characters in percent-encodings will be uppercase.
+    ///
+    /// If the segment is already normalized, the function will return immediately. Otherwise, if
+    /// the segment is not owned, this function will perform an allocation to clone it. The
+    /// normalization itself though, is done in-place with no extra memory allocations required.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Segment;
+    ///
+    /// let mut segment = Segment::try_from("segment").unwrap();
+    /// segment.normalize();
+    /// assert_eq!(segment, "segment");
+    ///
+    /// let mut segment = Segment::try_from("%ff%41").unwrap();
+    /// assert_eq!(segment, "%ff%41");
+    /// segment.normalize();
+    /// assert_eq!(segment, "%FFA");
+    /// ```
     pub fn normalize(&mut self) {
         if !self.normalized {
             normalize_string(&mut self.segment.to_mut(), true);
@@ -875,14 +986,9 @@ impl<'segment> TryFrom<&'segment str> for Segment<'segment> {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum InvalidPath {
+    /// The path exceeded the maximum length allowed. Due to implementation reasons, the maximum
+    /// length a path can be is 2^16 or 65536 characters.
     ExceededMaximumLength,
-
-    /// This error occurs when the string from which the path is parsed is not entirely consumed
-    /// during the parsing. For example, parsing the string `"/my/path?query"` would generate
-    /// this error since `"?query"` would still be left over.
-    ///
-    /// This only applies to the [`Path::try_from`] functions.
-    ExpectedEOF,
 
     /// The path contained an invalid character.
     InvalidCharacter,
@@ -903,7 +1009,6 @@ impl Error for InvalidPath {
 
         match self {
             ExceededMaximumLength => "exceeded maximum path length",
-            ExpectedEOF => "expected EOF",
             InvalidCharacter => "invalid path character",
             InvalidPercentEncoding => "invalid path percent encoding",
         }
@@ -1062,7 +1167,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_normalize() {
+    fn test_path_normalize() {
         fn test_case(value: &str, expected: &str, as_reference: bool) {
             let mut path = Path::try_from(value).unwrap();
             path.normalize(as_reference);
@@ -1138,7 +1243,7 @@ mod test {
     }
 
     #[test]
-    fn test_remove_dot_segments() {
+    fn test_path_remove_dot_segments() {
         fn test_case(value: &str, expected: &str) {
             let mut path = Path::try_from(value).unwrap();
             path.remove_dot_segments();
@@ -1168,5 +1273,34 @@ mod test {
         test_case("/a/b/./../", "/a/");
         test_case("/a/b/c/./../../g", "/a/g");
         test_case("mid/content=5/../6", "mid/6");
+    }
+
+    #[test]
+    fn test_segment_normalize() {
+        fn test_case(value: &str, expected: &str) {
+            let mut segment = Segment::try_from(value).unwrap();
+            segment.normalize();
+            assert_eq!(segment, expected);
+        }
+
+        test_case("", "");
+        test_case("%ff", "%FF");
+        test_case("%41", "A");
+    }
+
+    #[test]
+    fn test_segment_parse() {
+        use self::InvalidPath::*;
+
+        assert_eq!(Segment::try_from("").unwrap(), "");
+        assert_eq!(Segment::try_from("segment").unwrap(), "segment");
+        assert_eq!(Segment::try_from("sEgMeNt").unwrap(), "sEgMeNt");
+        assert_eq!(Segment::try_from("%ff%ff%ff%41").unwrap(), "%ff%ff%ff%41");
+
+        assert_eq!(Segment::try_from(" "), Err(InvalidCharacter));
+        assert_eq!(Segment::try_from("/"), Err(InvalidCharacter));
+        assert_eq!(Segment::try_from("%"), Err(InvalidPercentEncoding));
+        assert_eq!(Segment::try_from("%f"), Err(InvalidPercentEncoding));
+        assert_eq!(Segment::try_from("%zz"), Err(InvalidPercentEncoding));
     }
 }
