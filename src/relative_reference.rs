@@ -494,6 +494,10 @@ impl<'uri> RelativeReference<'uri> {
         self.uri_reference.map_query(mapper)
     }
 
+    pub fn normalize(&mut self) {
+        self.uri_reference.normalize();
+    }
+
     /// Returns the path of the relative reference.
     ///
     /// # Examples

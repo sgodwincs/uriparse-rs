@@ -520,6 +520,10 @@ impl<'uri> URI<'uri> {
             .map_scheme(|scheme| Some(mapper(scheme.unwrap())))
     }
 
+    pub fn normalize(&mut self) {
+        self.uri_reference.normalize();
+    }
+
     /// Returns the path of the URI.
     ///
     /// # Examples

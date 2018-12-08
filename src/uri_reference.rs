@@ -694,6 +694,22 @@ impl<'uri> URIReference<'uri> {
             .expect("mapped scheme resulted in invalid state")
     }
 
+    pub fn normalize(&mut self) {
+        if let Some(authority) = self.authority.as_mut() {
+            authority.normalize();
+        }
+
+        self.path.normalize(self.scheme.is_none());
+
+        if let Some(query) = self.query.as_mut() {
+            query.normalize();
+        }
+
+        if let Some(fragment) = self.fragment.as_mut() {
+            fragment.normalize();
+        }
+    }
+
     /// Returns the path of the URI reference.
     ///
     /// # Examples
