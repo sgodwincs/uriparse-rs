@@ -45,15 +45,19 @@ const FRAGMENT_CHAR_MAP: [u8; 256] = [
 /// reflected in the equality and hash functions.
 ///
 /// However, be aware that just because percent-encoding plays no role in equality checking does not
-/// mean that the fragment is normalized. The original fragment string will always be preserved as
-/// is with no normalization performed.
+/// mean that the fragment is normalized. If the fragment needs to be normalized, use the
+/// [`Fragment::normalize`] function.
 #[derive(Clone, Debug)]
 pub struct Fragment<'fragment> {
+    /// The internal fragment source that is either owened or borrowed.
     fragment: Cow<'fragment, str>,
+
+    /// Whether the fragment is normalized.
     normalized: bool,
 }
 
 impl Fragment<'_> {
+    /// Returns a new fragment which is identical but has as lifetime tied to this fragment.
     pub fn as_borrowed(&self) -> Fragment {
         use self::Cow::*;
 
@@ -101,10 +105,57 @@ impl Fragment<'_> {
         }
     }
 
+    /// Returns whether the fragment is normalization.
+    ///
+    /// A normalized fragment will have no bytes that are in the unreserved character set
+    /// percent-encoded and all alphabetical characters in percent-encodings will be uppercase.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Fragment;
+    ///
+    /// let fragment = Fragment::try_from("fragment").unwrap();
+    /// assert!(fragment.is_normalized());
+    ///
+    /// let mut fragment = Fragment::try_from("%ff%ff").unwrap();
+    /// assert!(!fragment.is_normalized());
+    /// fragment.normalize();
+    /// assert!(fragment.is_normalized());
+    /// ```
     pub fn is_normalized(&self) -> bool {
         self.normalized
     }
 
+    /// Normalizes the fragment such that it will have no bytes that are in the unreserved character
+    /// set percent-encoded and all alphabetical characters in percent-encodings will be uppercase.
+    ///
+    /// If the fragment is already normalized, the function will return immediately. Otherwise, if
+    /// the fragment is not owned, this function will perform an allocation to clone it. The
+    /// normalization itself though, is done in-place with no extra memory allocations required.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Fragment;
+    ///
+    /// let mut fragment = Fragment::try_from("fragment").unwrap();
+    /// fragment.normalize();
+    /// assert_eq!(fragment, "fragment");
+    ///
+    /// let mut fragment = Fragment::try_from("%ff%41").unwrap();
+    /// assert_eq!(fragment, "%ff%41");
+    /// fragment.normalize();
+    /// assert_eq!(fragment, "%FFA");
+    /// ```
     pub fn normalize(&mut self) {
         if !self.normalized {
             normalize_string(&mut self.fragment.to_mut(), true);
@@ -282,5 +333,38 @@ impl Error for InvalidFragment {
 impl From<!> for InvalidFragment {
     fn from(value: !) -> Self {
         value
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_normalize() {
+        fn test_case(value: &str, expected: &str) {
+            let mut fragment = Fragment::try_from(value).unwrap();
+            fragment.normalize();
+            assert_eq!(fragment, expected);
+        }
+
+        test_case("", "");
+        test_case("%ff", "%FF");
+        test_case("%41", "A");
+    }
+
+    #[test]
+    fn test_parse() {
+        use self::InvalidFragment::*;
+
+        assert_eq!(Fragment::try_from("").unwrap(), "");
+        assert_eq!(Fragment::try_from("fragment").unwrap(), "fragment");
+        assert_eq!(Fragment::try_from("fRaGmEnT").unwrap(), "fRaGmEnT");
+        assert_eq!(Fragment::try_from("%ff%ff%ff%41").unwrap(), "%ff%ff%ff%41");
+
+        assert_eq!(Fragment::try_from(" "), Err(InvalidCharacter));
+        assert_eq!(Fragment::try_from("%"), Err(InvalidPercentEncoding));
+        assert_eq!(Fragment::try_from("%f"), Err(InvalidPercentEncoding));
+        assert_eq!(Fragment::try_from("%zz"), Err(InvalidPercentEncoding));
     }
 }

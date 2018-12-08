@@ -49,15 +49,19 @@ const QUERY_CHAR_MAP: [u8; 256] = [
 /// reflected in the equality and hash functions.
 ///
 /// However, be aware that just because percent-encoding plays no role in equality checking does not
-/// mean that the query is normalized. The original query string will always be preserved as is with
-/// no normalization performed.
+/// mean that the query is normalized. If the query needs to be normalized, use the
+/// [`Query::normalize`] function.
 #[derive(Clone, Debug)]
 pub struct Query<'query> {
+    /// Whether the query is normalized.
     normalized: bool,
+
+    /// The internal query source that is either owened or borrowed.
     query: Cow<'query, str>,
 }
 
 impl Query<'_> {
+    /// Returns a new query which is identical but has as lifetime tied to this fragment.
     pub fn as_borrowed(&self) -> Query {
         use self::Cow::*;
 
@@ -105,10 +109,57 @@ impl Query<'_> {
         }
     }
 
+    /// Returns whether the query is normalization.
+    ///
+    /// A normalized query will have no bytes that are in the unreserved character set
+    /// percent-encoded and all alphabetical characters in percent-encodings will be uppercase.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Query;
+    ///
+    /// let query = Query::try_from("query").unwrap();
+    /// assert!(query.is_normalized());
+    ///
+    /// let mut query = Query::try_from("%ff%ff").unwrap();
+    /// assert!(!query.is_normalized());
+    /// query.normalize();
+    /// assert!(query.is_normalized());
+    /// ```
     pub fn is_normalized(&self) -> bool {
         self.normalized
     }
 
+    /// Normalizes the query such that it will have no bytes that are in the unreserved character
+    /// set percent-encoded and all alphabetical characters in percent-encodings will be uppercase.
+    ///
+    /// If the query is already normalized, the function will return immediately. Otherwise, if the
+    /// query is not owned, this function will perform an allocation to clone it. The normalization
+    /// itself though, is done in-place with no extra memory allocations required.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Query;
+    ///
+    /// let mut query = Query::try_from("query").unwrap();
+    /// query.normalize();
+    /// assert_eq!(query, "query");
+    ///
+    /// let mut query = Query::try_from("%ff%41").unwrap();
+    /// assert_eq!(query, "%ff%41");
+    /// query.normalize();
+    /// assert_eq!(query, "%FFA");
+    /// ```
     pub fn normalize(&mut self) {
         if !self.normalized {
             normalize_string(&mut self.query.to_mut(), true);
@@ -312,4 +363,37 @@ pub(crate) fn parse_query<'query>(
         query: Cow::from(unsafe { str::from_utf8_unchecked(value) }),
     };
     Ok((query, rest))
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_normalize() {
+        fn test_case(value: &str, expected: &str) {
+            let mut query = Query::try_from(value).unwrap();
+            query.normalize();
+            assert_eq!(query, expected);
+        }
+
+        test_case("", "");
+        test_case("%ff", "%FF");
+        test_case("%41", "A");
+    }
+
+    #[test]
+    fn test_parse() {
+        use self::InvalidQuery::*;
+
+        assert_eq!(Query::try_from("").unwrap(), "");
+        assert_eq!(Query::try_from("query").unwrap(), "query");
+        assert_eq!(Query::try_from("qUeRy").unwrap(), "qUeRy");
+        assert_eq!(Query::try_from("%ff%ff%ff%41").unwrap(), "%ff%ff%ff%41");
+
+        assert_eq!(Query::try_from(" "), Err(InvalidCharacter));
+        assert_eq!(Query::try_from("%"), Err(InvalidPercentEncoding));
+        assert_eq!(Query::try_from("%f"), Err(InvalidPercentEncoding));
+        assert_eq!(Query::try_from("%zz"), Err(InvalidPercentEncoding));
+    }
 }
