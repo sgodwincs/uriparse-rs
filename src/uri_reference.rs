@@ -695,6 +695,10 @@ impl<'uri> URIReference<'uri> {
     }
 
     pub fn normalize(&mut self) {
+        if let Some(scheme) = self.scheme.as_mut() {
+            scheme.normalize();
+        }
+
         if let Some(authority) = self.authority.as_mut() {
             authority.normalize();
         }

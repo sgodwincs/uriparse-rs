@@ -14,6 +14,8 @@ use std::fmt::{self, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::str;
 
+use crate::utility::normalize_string;
+
 /// The length of the longest currently registered scheme. This is used internally for parsing. Make
 /// sure to check this whenever adding a new scheme.
 const MAX_REGISTERED_SCHEME_LENGTH: usize = 36;
@@ -159,28 +161,33 @@ macro_rules! schemes {
 
         /// Parses the scheme from the given byte string.
         pub(crate) fn parse_scheme(value: &[u8]) -> Result<(Scheme, &[u8]), InvalidScheme> {
-            fn unregistered_scheme<'bytes>(value: &'bytes [u8]) -> Scheme<'bytes> {
+            fn unregistered_scheme<'bytes>(value: &'bytes [u8], normalized: bool) -> Scheme<'bytes> {
                 // Unsafe: The loop below makes sure this is safe.
 
                 let scheme = unsafe { str::from_utf8_unchecked(value) };
-                Scheme::Unregistered(UnregisteredScheme(Cow::from(scheme)))
+                Scheme::Unregistered(UnregisteredScheme{
+                    normalized,
+                    scheme:Cow::from(scheme)
+                })
             }
 
-            let mut bytes = value.iter();
-
-            if !bytes.next().ok_or(InvalidScheme::CannotBeEmpty)?.is_ascii_alphabetic() {
+            if !value.iter().next().ok_or(InvalidScheme::CannotBeEmpty)?.is_ascii_alphabetic() {
                 return Err(InvalidScheme::MustStartWithAlphabetic);
             }
 
-            let mut end_index = 1;
+            let mut end_index = 0;
             let mut lowercase_scheme = [0; MAX_REGISTERED_SCHEME_LENGTH];
-            lowercase_scheme[0] = value[0].to_ascii_lowercase();
+            let mut normalized = true;
 
-            while let Some(&byte) = bytes.next() {
+            for &byte in value.iter() {
                 match SCHEME_CHAR_MAP[byte as usize] {
                     0 if byte == b':' => break,
                     0 => return Err(InvalidScheme::InvalidCharacter),
                     _ => {
+                        if byte >= b'A' && byte <= b'Z' {
+                            normalized = false;
+                        }
+
                         if end_index + 1 < MAX_REGISTERED_SCHEME_LENGTH {
                             lowercase_scheme[end_index] = byte.to_ascii_lowercase();
                         }
@@ -196,15 +203,30 @@ macro_rules! schemes {
             // maintained, or registered schemes may be set as unregistered.
 
             if end_index > MAX_REGISTERED_SCHEME_LENGTH {
-                return Ok((unregistered_scheme(value), rest));
+                return Ok((unregistered_scheme(value, normalized), rest));
             }
 
             let scheme = SCHEME_NAME_MAP
                 .get(&lowercase_scheme[..end_index])
                 .cloned()
-                .unwrap_or_else(|| unregistered_scheme(value));
+                .unwrap_or_else(|| unregistered_scheme(value, normalized));
 
             Ok((scheme, rest))
+        }
+    }
+}
+
+impl Scheme<'_> {
+    pub fn is_normalized(&self) -> bool {
+        match self {
+            Scheme::Unregistered(scheme) => scheme.is_normalized(),
+            _ => true,
+        }
+    }
+
+    pub fn normalize(&mut self) {
+        if let Scheme::Unregistered(scheme) = self {
+            scheme.normalize();
         }
     }
 }
@@ -284,7 +306,10 @@ impl<'scheme> TryFrom<&'scheme str> for Scheme<'scheme> {
 ///
 /// This is case-insensitive, and this is reflected in the equality and hash functions.
 #[derive(Clone, Debug)]
-pub struct UnregisteredScheme<'scheme>(Cow<'scheme, str>);
+pub struct UnregisteredScheme<'scheme> {
+    normalized: bool,
+    scheme: Cow<'scheme, str>,
+}
 
 impl UnregisteredScheme<'_> {
     /// Returns a `str` representation of the scheme.
@@ -304,7 +329,7 @@ impl UnregisteredScheme<'_> {
     /// assert_eq!(scheme.as_str(), "TEST-scheme");
     /// ```
     pub fn as_str(&self) -> &str {
-        &self.0
+        &self.scheme
     }
 
     /// Converts the [`UnregisteredScheme`] into an owned copy.
@@ -316,25 +341,39 @@ impl UnregisteredScheme<'_> {
     /// This is different from just cloning. Cloning the scheme will just copy the references, and
     /// thus the lifetime will remain the same.
     pub fn into_owned(self) -> UnregisteredScheme<'static> {
-        UnregisteredScheme(Cow::from(self.0.into_owned()))
+        UnregisteredScheme {
+            normalized: self.normalized,
+            scheme: Cow::from(self.scheme.into_owned()),
+        }
+    }
+
+    pub fn is_normalized(&self) -> bool {
+        self.normalized
+    }
+
+    pub fn normalize(&mut self) {
+        if !self.normalized {
+            normalize_string(&mut self.scheme.to_mut(), true);
+            self.normalized = true;
+        }
     }
 }
 
 impl AsRef<[u8]> for UnregisteredScheme<'_> {
     fn as_ref(&self) -> &[u8] {
-        self.0.as_bytes()
+        self.scheme.as_bytes()
     }
 }
 
 impl AsRef<str> for UnregisteredScheme<'_> {
     fn as_ref(&self) -> &str {
-        &self.0
+        &self.scheme
     }
 }
 
 impl Display for UnregisteredScheme<'_> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        formatter.write_str(&self.0)
+        formatter.write_str(&self.scheme)
     }
 }
 
@@ -351,37 +390,37 @@ impl Hash for UnregisteredScheme<'_> {
     where
         H: Hasher,
     {
-        self.0.to_lowercase().hash(state)
+        self.scheme.to_lowercase().hash(state)
     }
 }
 
 impl PartialEq for UnregisteredScheme<'_> {
     fn eq(&self, other: &UnregisteredScheme) -> bool {
-        self.0.eq_ignore_ascii_case(&other.0)
+        self.scheme.eq_ignore_ascii_case(&other.scheme)
     }
 }
 
 impl PartialEq<str> for UnregisteredScheme<'_> {
     fn eq(&self, other: &str) -> bool {
-        self.0.eq_ignore_ascii_case(other)
+        self.scheme.eq_ignore_ascii_case(other)
     }
 }
 
 impl<'scheme> PartialEq<UnregisteredScheme<'scheme>> for str {
     fn eq(&self, other: &UnregisteredScheme<'scheme>) -> bool {
-        self.eq_ignore_ascii_case(&other.0)
+        self.eq_ignore_ascii_case(&other.scheme)
     }
 }
 
 impl<'a> PartialEq<&'a str> for UnregisteredScheme<'_> {
     fn eq(&self, other: &&'a str) -> bool {
-        self.0.eq_ignore_ascii_case(other)
+        self.scheme.eq_ignore_ascii_case(other)
     }
 }
 
 impl<'a, 'scheme> PartialEq<UnregisteredScheme<'scheme>> for &'a str {
     fn eq(&self, other: &UnregisteredScheme<'scheme>) -> bool {
-        self.eq_ignore_ascii_case(&other.0)
+        self.eq_ignore_ascii_case(&other.scheme)
     }
 }
 
