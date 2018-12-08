@@ -74,7 +74,7 @@ impl<'uri> URIReference<'uri> {
         URIReferenceBuilder::default()
     }
 
-    /// Returns whether or not the URI reference can act as a base URI.
+    /// Returns whether the URI reference can act as a base URI.
     ///
     /// A URI can be a base if it is absolute (i.e. it has no fragment component).
     ///
@@ -208,7 +208,7 @@ impl<'uri> URIReference<'uri> {
         self.fragment.as_ref()
     }
 
-    /// Returns whether or not the URI reference has an authority component.
+    /// Returns whether the URI reference has an authority component.
     ///
     /// # Examples
     ///
@@ -229,7 +229,7 @@ impl<'uri> URIReference<'uri> {
         self.authority.is_some()
     }
 
-    /// Returns whether or not the URI reference has a fragment component.
+    /// Returns whether the URI reference has a fragment component.
     ///
     /// # Examples
     ///
@@ -250,7 +250,7 @@ impl<'uri> URIReference<'uri> {
         self.fragment.is_some()
     }
 
-    /// Returns whether or not the URI reference has a password component.
+    /// Returns whether the URI reference has a password component.
     ///
     /// # Examples
     ///
@@ -275,7 +275,7 @@ impl<'uri> URIReference<'uri> {
         }
     }
 
-    /// Returns whether or not the URI reference has a query component.
+    /// Returns whether the URI reference has a query component.
     ///
     /// # Examples
     ///
@@ -296,7 +296,7 @@ impl<'uri> URIReference<'uri> {
         self.query.is_some()
     }
 
-    /// Returns whether or not the URI reference has a scheme component.
+    /// Returns whether the URI reference has a scheme component.
     ///
     /// # Examples
     ///
@@ -317,7 +317,7 @@ impl<'uri> URIReference<'uri> {
         self.scheme.is_some()
     }
 
-    /// Returns whether or not the URI reference has a username component.
+    /// Returns whether the URI reference has a username component.
     ///
     /// # Examples
     ///
@@ -457,7 +457,7 @@ impl<'uri> URIReference<'uri> {
         )
     }
 
-    /// Returns whether or not the URI reference is an absolute path reference.
+    /// Returns whether the URI reference is an absolute path reference.
     ///
     /// A URI reference is an absolute path reference if it is a relative reference that begins with
     /// a single `'/'`.
@@ -478,7 +478,7 @@ impl<'uri> URIReference<'uri> {
         self.scheme.is_none() && self.authority.is_none() && self.path.is_absolute()
     }
 
-    /// Returns whether or not the URI reference is a network path reference.
+    /// Returns whether the URI reference is a network path reference.
     ///
     /// A URI reference is a network path reference if it is a relative reference that begins with
     /// two `'/'`.
@@ -499,7 +499,7 @@ impl<'uri> URIReference<'uri> {
         self.scheme.is_none() && self.authority.is_some()
     }
 
-    /// Returns whether or not the URI reference is a relative path reference.
+    /// Returns whether the URI reference is a relative path reference.
     ///
     /// A URI reference is a relative path reference if it is a relative reference that does not
     /// begin with a `'/'`.
@@ -520,7 +520,7 @@ impl<'uri> URIReference<'uri> {
         self.scheme.is_none() && self.authority.is_none() && !self.path.is_absolute()
     }
 
-    /// Returns whether or not the URI reference is a relative reference.
+    /// Returns whether the URI reference is a relative reference.
     ///
     /// A URI reference is a relative reference if it has no scheme.
     ///
@@ -540,7 +540,7 @@ impl<'uri> URIReference<'uri> {
         self.scheme.is_none()
     }
 
-    /// Returns whether or not the URI reference is a URI.
+    /// Returns whether the URI reference is a URI.
     ///
     /// A URI reference is a URI if it has a scheme.
     ///
@@ -892,7 +892,7 @@ impl<'uri> URIReference<'uri> {
     ///  - The conversion to [`Path`] failed.
     ///  - The path was set to a value that resulted in an invalid URI reference.
     ///
-    /// Regardless of whether or not the given path was set as absolute or relative, if the URI
+    /// Regardless of whether the given path was set as absolute or relative, if the URI
     /// reference currently has an authority, the path will be forced to be absolute.
     ///
     /// # Examples

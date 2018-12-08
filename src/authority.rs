@@ -223,7 +223,7 @@ impl<'authority> Authority<'authority> {
         })
     }
 
-    /// Returns whether or not there is a password in the authority as defined in
+    /// Returns whether there is a password in the authority as defined in
     /// [[RFC3986, Section 3.2.1](https://tools.ietf.org/html/rfc3986#section-3.2.1)].
     ///
     /// There will only be a password if the URI has a user information component *and* the
@@ -245,7 +245,7 @@ impl<'authority> Authority<'authority> {
         self.password.is_some()
     }
 
-    /// Returns whether or not there is a username in the authority as defined in
+    /// Returns whether there is a username in the authority as defined in
     /// [[RFC3986, Section 3.2.1](https://tools.ietf.org/html/rfc3986#section-3.2.1)].
     ///
     /// There will *always* be a username as long as there is a `'@'` delimiter present in the
@@ -749,7 +749,7 @@ pub enum Host<'host> {
 }
 
 impl Host<'_> {
-    /// Returns whether or not the host is an IPv4 address.
+    /// Returns whether the host is an IPv4 address.
     ///
     /// # Examples
     ///
@@ -770,7 +770,7 @@ impl Host<'_> {
         }
     }
 
-    /// Returns whether or not the host is an IPv6 address.
+    /// Returns whether the host is an IPv6 address.
     ///
     /// # Examples
     ///
@@ -798,7 +798,7 @@ impl Host<'_> {
         }
     }
 
-    /// Returns whether or not the host is a registered name.
+    /// Returns whether the host is a registered name.
     ///
     /// # Examples
     ///

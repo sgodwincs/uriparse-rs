@@ -74,7 +74,7 @@ impl<'uri> URI<'uri> {
         URIBuilder::new()
     }
 
-    /// Returns whether or not the URI can act as a base URI.
+    /// Returns whether the URI can act as a base URI.
     ///
     /// A URI can be a base if it is absolute (i.e. it has no fragment component).
     ///
@@ -176,7 +176,7 @@ impl<'uri> URI<'uri> {
         self.uri_reference.fragment()
     }
 
-    /// Returns whether or not the URI has an authority component.
+    /// Returns whether the URI has an authority component.
     ///
     /// # Examples
     ///
@@ -197,7 +197,7 @@ impl<'uri> URI<'uri> {
         self.uri_reference.has_authority()
     }
 
-    /// Returns whether or not the URI has a fragment component.
+    /// Returns whether the URI has a fragment component.
     ///
     /// # Examples
     ///
@@ -218,7 +218,7 @@ impl<'uri> URI<'uri> {
         self.uri_reference.has_fragment()
     }
 
-    /// Returns whether or not the URI has a password component.
+    /// Returns whether the URI has a password component.
     ///
     /// # Examples
     ///
@@ -239,7 +239,7 @@ impl<'uri> URI<'uri> {
         self.uri_reference.has_password()
     }
 
-    /// Returns whether or not the URI has a query component.
+    /// Returns whether the URI has a query component.
     ///
     /// # Examples
     ///
@@ -260,7 +260,7 @@ impl<'uri> URI<'uri> {
         self.uri_reference.has_query()
     }
 
-    /// Returns whether or not the URI has a username component.
+    /// Returns whether the URI has a username component.
     ///
     /// # Examples
     ///
@@ -760,7 +760,7 @@ impl<'uri> URI<'uri> {
     ///  - The conversion to [`Path`] failed.
     ///  - The path was set to a value that resulted in an invalid URI.
     ///
-    /// Regardless of whether or not the given path was set as absolute or relative, if the URI
+    /// Regardless of whether the given path was set as absolute or relative, if the URI
     /// reference currently has an authority, the path will be forced to be absolute.
     ///
     /// # Examples

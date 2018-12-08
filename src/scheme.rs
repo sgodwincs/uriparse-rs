@@ -526,7 +526,7 @@ pub enum SchemeStatus {
 }
 
 impl SchemeStatus {
-    /// Returns whether or not the scheme status is historical.
+    /// Returns whether the scheme status is historical.
     ///
     /// # Examples
     ///
@@ -543,7 +543,7 @@ impl SchemeStatus {
         }
     }
 
-    /// Returns whether or not the scheme status is historical.
+    /// Returns whether the scheme status is historical.
     ///
     /// # Examples
     ///
@@ -560,7 +560,7 @@ impl SchemeStatus {
         }
     }
 
-    /// Returns whether or not the scheme status is historical.
+    /// Returns whether the scheme status is historical.
     ///
     /// # Examples
     ///
@@ -577,7 +577,7 @@ impl SchemeStatus {
         }
     }
 
-    /// Returns whether or not the scheme status is historical.
+    /// Returns whether the scheme status is historical.
     ///
     /// # Examples
     ///

@@ -42,11 +42,11 @@ const PATH_CHAR_MAP: [u8; 256] = [
 ///
 /// A path is composed of a sequence of segments. It is also either absolute or relative, where an
 /// absolute path starts with a `'/'`. A URI with an authority *always* has an absolute path
-/// regardless of whether or not the path was empty (i.e. "http://example.com" has a single empty
+/// regardless of whether the path was empty (i.e. "http://example.com" has a single empty
 /// path segment and is absolute).
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Path<'path> {
-    /// Whether or not the path is absolute. Specifically, a path is absolute if it starts with a
+    /// whether the path is absolute. Specifically, a path is absolute if it starts with a
     /// `'/'`.
     absolute: bool,
 
@@ -109,7 +109,7 @@ impl<'path> Path<'path> {
         }
     }
 
-    /// Returns whether or not the path is absolute (i.e. it starts with a `'/'`).
+    /// Returns whether the path is absolute (i.e. it starts with a `'/'`).
     ///
     /// Any path following an [`Authority`] will *always* be parsed to be absolute.
     ///
@@ -146,7 +146,7 @@ impl<'path> Path<'path> {
         }
     }
 
-    /// Returns whether or not the path is relative (i.e. it does not start with a `'/'`).
+    /// Returns whether the path is relative (i.e. it does not start with a `'/'`).
     ///
     /// Any path following an [`Authority`] will *always* be parsed to be absolute.
     ///
@@ -470,7 +470,7 @@ impl<'path> Path<'path> {
         &mut self.segments
     }
 
-    /// Sets whether or not the path is absolute (i.e. it starts with a `'/'`).
+    /// Sets whether the path is absolute (i.e. it starts with a `'/'`).
     ///
     /// # Examples
     ///

@@ -133,7 +133,7 @@ impl<'uri> RelativeReference<'uri> {
         self.uri_reference.fragment()
     }
 
-    /// Returns whether or not the relative reference has an authority component.
+    /// Returns whether the relative reference has an authority component.
     ///
     /// # Examples
     ///
@@ -154,7 +154,7 @@ impl<'uri> RelativeReference<'uri> {
         self.uri_reference.has_authority()
     }
 
-    /// Returns whether or not the relative reference has a fragment component.
+    /// Returns whether the relative reference has a fragment component.
     ///
     /// # Examples
     ///
@@ -175,7 +175,7 @@ impl<'uri> RelativeReference<'uri> {
         self.uri_reference.has_fragment()
     }
 
-    /// Returns whether or not the relative reference has a password component.
+    /// Returns whether the relative reference has a password component.
     ///
     /// # Examples
     ///
@@ -196,7 +196,7 @@ impl<'uri> RelativeReference<'uri> {
         self.uri_reference.has_password()
     }
 
-    /// Returns whether or not the relative reference has a query component.
+    /// Returns whether the relative reference has a query component.
     ///
     /// # Examples
     ///
@@ -217,7 +217,7 @@ impl<'uri> RelativeReference<'uri> {
         self.uri_reference.has_query()
     }
 
-    /// Returns whether or not the relative reference has a username component.
+    /// Returns whether the relative reference has a username component.
     ///
     /// # Examples
     ///
@@ -333,7 +333,7 @@ impl<'uri> RelativeReference<'uri> {
         (authority, path, query, fragment)
     }
 
-    /// Returns whether or not the relative reference is an absolute path reference.
+    /// Returns whether the relative reference is an absolute path reference.
     ///
     /// A URI reference is an absolute path reference if it is a relative reference that begins with
     /// a single `'/'`.
@@ -354,7 +354,7 @@ impl<'uri> RelativeReference<'uri> {
         self.uri_reference.is_absolute_path_reference()
     }
 
-    /// Returns whether or not the relative reference is a network path reference.
+    /// Returns whether the relative reference is a network path reference.
     ///
     /// A relative reference is a network path reference if it is a relative reference that begins
     /// with two `'/'`.
@@ -375,7 +375,7 @@ impl<'uri> RelativeReference<'uri> {
         self.uri_reference.is_network_path_reference()
     }
 
-    /// Returns whether or not the relative reference is a relative path reference.
+    /// Returns whether the relative reference is a relative path reference.
     ///
     /// A relative reference is a relative path reference if it is a relative reference that does
     /// not begin with a `'/'`.
@@ -640,7 +640,7 @@ impl<'uri> RelativeReference<'uri> {
     ///  - The conversion to [`Path`] failed.
     ///  - The path was set to a value that resulted in an invalid URI reference.
     ///
-    /// Regardless of whether or not the given path was set as absolute or relative, if the relative
+    /// Regardless of whether the given path was set as absolute or relative, if the relative
     /// reference currently has an authority, the path will be forced to be absolute.
     ///
     /// # Examples
