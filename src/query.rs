@@ -45,8 +45,8 @@ const QUERY_CHAR_MAP: [u8; 256] = [
 /// [[RFC3986, Section 3.4](https://tools.ietf.org/html/rfc3986#section-3.4)].
 ///
 /// The query is case-sensitive. Furthermore, percent-encoding plays no role in equality checking
-/// meaning that `"query"` and `"que%72y"` are the same query. Both of these attributes are
-/// reflected in the equality and hash functions.
+/// for characters in the unreserved character set meaning that `"query"` and `"que%72y"` are
+/// identical. Both of these attributes are reflected in the equality and hash functions.
 ///
 /// However, be aware that just because percent-encoding plays no role in equality checking does not
 /// mean that the query is normalized. If the query needs to be normalized, use the
@@ -61,7 +61,7 @@ pub struct Query<'query> {
 }
 
 impl Query<'_> {
-    /// Returns a new query which is identical but has as lifetime tied to this query.
+    /// Returns a new query which is identical but has a lifetime tied to this query.
     pub fn as_borrowed(&self) -> Query {
         use self::Cow::*;
 
@@ -113,6 +113,8 @@ impl Query<'_> {
     ///
     /// A normalized query will have no bytes that are in the unreserved character set
     /// percent-encoded and all alphabetical characters in percent-encodings will be uppercase.
+    ///
+    /// This function returns in constant-time.
     ///
     /// # Examples
     ///

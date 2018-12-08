@@ -41,8 +41,8 @@ const FRAGMENT_CHAR_MAP: [u8; 256] = [
 /// [[RFC3986, Section 3.5](https://tools.ietf.org/html/rfc3986#section-3.5)].
 ///
 /// The fragment is case-sensitive. Furthermore, percent-encoding plays no role in equality checking
-/// meaning that `"fragment"` and `"fr%61gment"` are the same fragment. Both of these attributes are
-/// reflected in the equality and hash functions.
+/// for characters in the unreserved character set meaning that `"fragment"` and `"fr%61gment"` are
+/// identical. Both of these attributes are reflected in the equality and hash functions.
 ///
 /// However, be aware that just because percent-encoding plays no role in equality checking does not
 /// mean that the fragment is normalized. If the fragment needs to be normalized, use the
@@ -57,7 +57,7 @@ pub struct Fragment<'fragment> {
 }
 
 impl Fragment<'_> {
-    /// Returns a new fragment which is identical but has as lifetime tied to this fragment.
+    /// Returns a new fragment which is identical but has a lifetime tied to this fragment.
     pub fn as_borrowed(&self) -> Fragment {
         use self::Cow::*;
 
@@ -109,6 +109,8 @@ impl Fragment<'_> {
     ///
     /// A normalized fragment will have no bytes that are in the unreserved character set
     /// percent-encoded and all alphabetical characters in percent-encodings will be uppercase.
+    ///
+    /// This function returns in constant-time.
     ///
     /// # Examples
     ///
