@@ -44,21 +44,35 @@ const PATH_CHAR_MAP: [u8; 256] = [
 /// absolute path starts with a `'/'`. A URI with an authority *always* has an absolute path
 /// regardless of whether the path was empty (i.e. "http://example.com" has a single empty
 /// path segment and is absolute).
+///
+/// Each segment in the path is case-sensitive. Furthermore, percent-encoding plays no role in
+/// equality checking for characters in the unreserved character set meaning that `"segment"` and
+/// `"s%65gment"` identical. Both of these attributes are reflected in the equality and hash
+/// functions.
+///
+/// However, be aware that just because percent-encoding plays no role in equality checking does not
+/// mean that either the path or a given segment is normalized. If the path or a segment needs to be
+/// normalized, use either the [`Path::normalize`] or [`Segment::normalize`] functions,
+/// respectively.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Path<'path> {
     /// whether the path is absolute. Specifically, a path is absolute if it starts with a
     /// `'/'`.
     absolute: bool,
 
+    /// The total number of double dot segments in the path.
     double_dot_segment_count: u16,
 
+    /// The number of double dot segments consecutive from the beginning of the path.
     leading_double_dot_segment_count: u16,
 
     /// The sequence of segments that compose the path.
     segments: Vec<Segment<'path>>,
 
+    /// The total number of single dot segments in the path.
     single_dot_segment_count: u16,
 
+    /// The total number of unnormalized segments in the path.
     unnormalized_count: u16,
 }
 
@@ -129,6 +143,36 @@ impl<'path> Path<'path> {
         self.absolute
     }
 
+    /// Returns whether the path is normalized either as or as not a reference.
+    ///
+    /// See [`Path::normalize`] for a full description of what path normalization entails.
+    ///
+    /// Although this function does not operate in constant-time in general, it will be
+    /// constant-time in the vast majority of cases.
+    ///
+    ///
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Path;
+    ///
+    /// let path = Path::try_from("/my/path").unwrap();
+    /// assert!(path.is_normalized(false));
+    ///
+    /// let path = Path::try_from("/my/p%61th").unwrap();
+    /// assert!(!path.is_normalized(false));
+    ///
+    /// let path = Path::try_from("..").unwrap();
+    /// assert!(path.is_normalized(true));
+    ///
+    /// let path = Path::try_from("../.././.").unwrap();
+    /// assert!(!path.is_normalized(true));
+    /// ```
     pub fn is_normalized(&self, as_reference: bool) -> bool {
         if self.unnormalized_count != 0 {
             return false;
@@ -181,6 +225,26 @@ impl<'path> Path<'path> {
         }
     }
 
+    /// Normalizes the path and all of its segments.
+    ///
+    /// There are two components to path normalization, the normalization of each segment
+    /// individually and the removal of unnecessary dot segments. It is also guaranteed that whether
+    /// the path is absolute will not change due to normalization.
+    ///
+    /// The normalization of each segment will proceed according to [`Segment::normalize`].
+    ///
+    /// If the path is absolute (i.e., it starts with a `'/'`), then `as_reference` will be set to
+    /// `false` regardless of its set value.
+    ///
+    /// If `as_reference` is `false`, then all dot segments will be removed as they would be if you
+    /// had called [`Path::remove_dot_segments`]. Otherwise, when a dot segment is removed is
+    /// dependent on whether it's `"."` or `".."` and its location in the path.
+    ///
+    /// In general, `"."` dot segments are always removed except for when it is at the beginning of
+    /// the path and is followed by a segment containing a `':'`, e.g. `"./a:b"` stays the same.
+    ///
+    /// For `".."` dot segments, they are kept whenever they are at the beginning of the path and
+    /// removed whenever they are not, e.g. `"a/../.."` normalizes to `".."`.
     pub fn normalize(&mut self, as_reference: bool) {
         if self.is_normalized(as_reference) {
             return;
@@ -213,7 +277,16 @@ impl<'path> Path<'path> {
                     None if new_length == 0 => (),
                     Some(index) if index == new_length - 1 => (),
                     _ => {
+                        if new_length == 2
+                            && self.segments[0].is_single_dot_segment()
+                            && (i == self.segments.len() - 1
+                                || !self.segments[i + 1].as_str().contains(':'))
+                        {
+                            new_length -= 1
+                        }
+
                         new_length -= 1;
+
                         continue;
                     }
                 }
@@ -234,7 +307,7 @@ impl<'path> Path<'path> {
 
         self.double_dot_segment_count = double_dot_segment_count;
         self.leading_double_dot_segment_count = double_dot_segment_count;
-        self.single_dot_segment_count = if self.segments[0].as_str() == "." {
+        self.single_dot_segment_count = if self.segments[0].is_single_dot_segment() {
             1
         } else {
             0
@@ -352,6 +425,26 @@ impl<'path> Path<'path> {
         Ok(())
     }
 
+    /// Removes all dot segments from the path according to the algorithm described in
+    /// [[RFC3986, Section 5.2.4](https://tools.ietf.org/html/rfc3986#section-5.2.4)].
+    ///
+    /// This function will perform no memory allocations during removal of dot segments.
+    ///
+    /// If the path currently has no dot segments, then this function is a no-op.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Path;
+    ///
+    /// let mut path = Path::try_from("/a/b/c/./../../g").unwrap();
+    /// path.remove_dot_segments();
+    /// assert_eq!(path, "/a/g");
+    /// ```
     pub fn remove_dot_segments(&mut self) {
         if self.single_dot_segment_count == 0 && self.double_dot_segment_count == 0 {
             return;
@@ -360,17 +453,18 @@ impl<'path> Path<'path> {
         self.remove_dot_segments_helper(false);
     }
 
+    /// Helper function that removes all dot segments with optional segment normalization.
     fn remove_dot_segments_helper(&mut self, normalize_segments: bool) {
         let mut input_absolute = self.absolute;
         let mut new_length = 0;
 
         for i in 0..self.segments.len() {
-            let segment = self.segments[i].as_str();
+            let segment = &self.segments[i];
 
             if input_absolute {
-                if segment == "." {
+                if segment.is_single_dot_segment() {
                     continue;
-                } else if segment == ".." {
+                } else if segment.is_double_dot_segment() {
                     if new_length > 0 {
                         new_length -= 1;
                     } else {
@@ -383,7 +477,7 @@ impl<'path> Path<'path> {
                 if new_length == 0 {
                     self.absolute = true;
                 }
-            } else if segment == ".." || segment == "." {
+            } else if segment.is_single_dot_segment() || segment.is_double_dot_segment() {
                 continue;
             }
 
@@ -489,6 +583,9 @@ impl<'path> Path<'path> {
         self.absolute = absolute;
     }
 
+    /// Returns a new path which is identical but has a lifetime tied to this path.
+    ///
+    /// This function will perform a memory allocation.
     pub fn to_borrowed(&self) -> Path {
         let segments = self
             .segments
@@ -1068,7 +1165,7 @@ pub(crate) fn parse_path<'path>(
 
     let mut bytes = value.iter();
     let mut double_dot_segment_count = 0;
-    let mut index = 0;
+    let mut index = 1;
     let mut last_double_dot_segment = None;
     let mut leading_double_dot_segment_count = 0;
     let mut normalized = true;
@@ -1085,7 +1182,7 @@ pub(crate) fn parse_path<'path>(
             0 if byte == b'?' || byte == b'#' => {
                 let segment = new_segment(
                     &value[segment_start_index..segment_end_index],
-                    index,
+                    index - 1,
                     normalized,
                     &mut unnormalized_count,
                     &mut single_dot_segment_count,
@@ -1108,7 +1205,7 @@ pub(crate) fn parse_path<'path>(
             0 if byte == b'/' => {
                 let segment = new_segment(
                     &value[segment_start_index..segment_end_index],
-                    index,
+                    index - 1,
                     normalized,
                     &mut unnormalized_count,
                     &mut single_dot_segment_count,
@@ -1141,7 +1238,7 @@ pub(crate) fn parse_path<'path>(
 
     let segment = new_segment(
         &value[segment_start_index..],
-        index,
+        index - 1,
         normalized,
         &mut unnormalized_count,
         &mut single_dot_segment_count,
@@ -1210,6 +1307,8 @@ mod test {
         test_case("a/../", "", true);
         test_case("a/../..", "..", true);
         test_case("./a:b", "./a:b", true);
+        test_case("./a:b/..", "", true);
+        test_case("./a:b/../c:d", "./c:d", true);
         test_case("./../a:b", "../a:b", true);
         test_case("../a/../", "../", true);
         test_case("../../.././.././../../../.", "../../../../../../..", true);
@@ -1240,6 +1339,32 @@ mod test {
             "this/is/a/test/path/%FF",
             false,
         );
+    }
+
+    #[test]
+    fn test_path_parse() {
+        use self::InvalidPath::*;
+
+        let slash = "/".to_string();
+
+        assert_eq!(Path::try_from("").unwrap(), "");
+        assert_eq!(Path::try_from("/").unwrap(), "/");
+        assert_eq!(
+            Path::try_from("/tHiS/iS/a/PaTh").unwrap(),
+            "/tHiS/iS/a/PaTh"
+        );
+        assert_eq!(Path::try_from("%ff%ff%ff%41").unwrap(), "%ff%ff%ff%41");
+        assert!(Path::try_from(&*slash.repeat(65535)).is_ok());
+
+        assert_eq!(
+            Path::try_from(&*slash.repeat(65536)),
+            Err(ExceededMaximumLength)
+        );
+        assert_eq!(Path::try_from(" "), Err(InvalidCharacter));
+        assert_eq!(Path::try_from("#"), Err(InvalidCharacter));
+        assert_eq!(Path::try_from("%"), Err(InvalidPercentEncoding));
+        assert_eq!(Path::try_from("%f"), Err(InvalidPercentEncoding));
+        assert_eq!(Path::try_from("%zz"), Err(InvalidPercentEncoding));
     }
 
     #[test]
