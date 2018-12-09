@@ -400,6 +400,31 @@ impl<'uri> URI<'uri> {
         (scheme.unwrap(), authority, path, query, fragment)
     }
 
+    /// Returns whether the URI is normalized.
+    ///
+    /// A normalized URI will have all of its components normalized.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URI;
+    ///
+    /// let uri = URI::try_from("http://example.com/?a=b").unwrap();
+    /// assert!(uri.is_normalized());
+    ///
+    /// let mut uri = URI::try_from("http://EXAMPLE.com/?a=b").unwrap();
+    /// assert!(!uri.is_normalized());
+    /// uri.normalize();
+    /// assert!(uri.is_normalized());
+    /// ```
+    pub fn is_normalized(&self) -> bool {
+        self.uri_reference.is_normalized()
+    }
+
     /// Maps the authority using the given map function.
     ///
     /// This function will panic if, as a result of the authority change, the URI reference becomes
@@ -520,6 +545,28 @@ impl<'uri> URI<'uri> {
             .map_scheme(|scheme| Some(mapper(scheme.unwrap())))
     }
 
+    /// Normalizes the URI.
+    ///
+    /// A normalized URI will have all of its components normalized.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URI;
+    ///
+    /// let mut uri = URI::try_from("http://example.com/?a=b").unwrap();
+    /// uri.normalize();
+    /// assert_eq!(uri.to_string(), "http://example.com/?a=b");
+    ///
+    /// let mut uri = URI::try_from("http://EXAMPLE.com/?a=b").unwrap();
+    /// assert_eq!(uri.to_string(), "http://EXAMPLE.com/?a=b");
+    /// uri.normalize();
+    /// assert_eq!(uri.to_string(), "http://example.com/?a=b");
+    /// ```
     pub fn normalize(&mut self) {
         self.uri_reference.normalize();
     }

@@ -375,6 +375,31 @@ impl<'uri> RelativeReference<'uri> {
         self.uri_reference.is_network_path_reference()
     }
 
+    /// Returns whether the relative reference is normalized.
+    ///
+    /// A normalized relative reference will have all of its components normalized.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::RelativeReference;
+    ///
+    /// let reference = RelativeReference::try_from("/?a=b").unwrap();
+    /// assert!(reference.is_normalized());
+    ///
+    /// let mut reference = RelativeReference::try_from("/././?a=b").unwrap();
+    /// assert!(!reference.is_normalized());
+    /// reference.normalize();
+    /// assert!(reference.is_normalized());
+    /// ```
+    pub fn is_normalized(&self) -> bool {
+        self.uri_reference.is_normalized()
+    }
+
     /// Returns whether the relative reference is a relative path reference.
     ///
     /// A relative reference is a relative path reference if it is a relative reference that does
@@ -494,6 +519,28 @@ impl<'uri> RelativeReference<'uri> {
         self.uri_reference.map_query(mapper)
     }
 
+    /// Normalizes the relative reference.
+    ///
+    /// A normalized relative reference will have all of its components normalized.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::RelativeReference;
+    ///
+    /// let mut reference = RelativeReference::try_from("/?a=b").unwrap();
+    /// reference.normalize();
+    /// assert_eq!(reference.to_string(), "/?a=b");
+    ///
+    /// let mut reference = RelativeReference::try_from("/././?a=b").unwrap();
+    /// assert_eq!(reference.to_string(), "/././?a=b");
+    /// reference.normalize();
+    /// assert_eq!(reference.to_string(), "/?a=b");
+    /// ```
     pub fn normalize(&mut self) {
         self.uri_reference.normalize();
     }

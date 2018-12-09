@@ -499,6 +499,59 @@ impl<'uri> URIReference<'uri> {
         self.scheme.is_none() && self.authority.is_some()
     }
 
+    /// Returns whether the URI reference is normalized.
+    ///
+    /// A normalized URI reference will have all of its components normalized.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let reference = URIReference::try_from("http://example.com/?a=b").unwrap();
+    /// assert!(reference.is_normalized());
+    ///
+    /// let mut reference = URIReference::try_from("http://EXAMPLE.com/?a=b").unwrap();
+    /// assert!(!reference.is_normalized());
+    /// reference.normalize();
+    /// assert!(reference.is_normalized());
+    /// ```
+    pub fn is_normalized(&self) -> bool {
+        if let Some(scheme) = self.scheme.as_ref() {
+            if !scheme.is_normalized() {
+                return false;
+            }
+        }
+
+        if let Some(authority) = self.authority.as_ref() {
+            if !authority.is_normalized() {
+                return false;
+            }
+        }
+
+        if !self.path.is_normalized(self.scheme.is_none()) {
+            return false;
+        }
+
+        if let Some(query) = self.query.as_ref() {
+            if !query.is_normalized() {
+                return false;
+            }
+        }
+
+        if let Some(fragment) = self.fragment.as_ref() {
+            if !fragment.is_normalized() {
+                return false;
+            }
+        }
+
+        true
+    }
+
     /// Returns whether the URI reference is a relative path reference.
     ///
     /// A URI reference is a relative path reference if it is a relative reference that does not
@@ -694,6 +747,28 @@ impl<'uri> URIReference<'uri> {
             .expect("mapped scheme resulted in invalid state")
     }
 
+    /// Normalizes the URI reference.
+    ///
+    /// A normalized URI reference will have all of its components normalized.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let mut reference = URIReference::try_from("http://example.com/?a=b").unwrap();
+    /// reference.normalize();
+    /// assert_eq!(reference.to_string(), "http://example.com/?a=b");
+    ///
+    /// let mut reference = URIReference::try_from("http://EXAMPLE.com/?a=b").unwrap();
+    /// assert_eq!(reference.to_string(), "http://EXAMPLE.com/?a=b");
+    /// reference.normalize();
+    /// assert_eq!(reference.to_string(), "http://example.com/?a=b");
+    /// ```
     pub fn normalize(&mut self) {
         if let Some(scheme) = self.scheme.as_mut() {
             scheme.normalize();
