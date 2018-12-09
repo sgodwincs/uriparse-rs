@@ -239,6 +239,27 @@ impl<'uri> URI<'uri> {
         self.uri_reference.has_password()
     }
 
+    /// Returns whether the URI has a port.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URI;
+    ///
+    /// let uri = URI::try_from("http://127.0.0.1:8080").unwrap();
+    /// assert!(uri.has_port());
+    ///
+    /// let uri = URI::try_from("http://127.0.0.1").unwrap();
+    /// assert!(!uri.has_port());
+    /// ```
+    pub fn has_port(&self) -> bool {
+        self.uri_reference.has_port()
+    }
+
     /// Returns whether the URI has a query component.
     ///
     /// # Examples

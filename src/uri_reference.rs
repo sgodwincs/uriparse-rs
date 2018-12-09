@@ -275,6 +275,31 @@ impl<'uri> URIReference<'uri> {
         }
     }
 
+    /// Returns whether the URI reference has a port.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::URIReference;
+    ///
+    /// let reference = URIReference::try_from("http://127.0.0.1:8080").unwrap();
+    /// assert!(reference.has_port());
+    ///
+    /// let reference = URIReference::try_from("http://127.0.0.1").unwrap();
+    /// assert!(!reference.has_port());
+    /// ```
+    pub fn has_port(&self) -> bool {
+        if let Some(ref authority) = self.authority {
+            authority.has_port()
+        } else {
+            false
+        }
+    }
+
     /// Returns whether the URI reference has a query component.
     ///
     /// # Examples

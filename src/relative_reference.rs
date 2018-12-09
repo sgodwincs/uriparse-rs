@@ -196,6 +196,27 @@ impl<'uri> RelativeReference<'uri> {
         self.uri_reference.has_password()
     }
 
+    /// Returns whether the relative reference has a port.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::RelativeReference;
+    ///
+    /// let reference = RelativeReference::try_from("//127.0.0.1:8080").unwrap();
+    /// assert!(reference.has_port());
+    ///
+    /// let reference = RelativeReference::try_from("//127.0.0.1").unwrap();
+    /// assert!(!reference.has_port());
+    /// ```
+    pub fn has_port(&self) -> bool {
+        self.uri_reference.has_port()
+    }
+
     /// Returns whether the relative reference has a query component.
     ///
     /// # Examples
