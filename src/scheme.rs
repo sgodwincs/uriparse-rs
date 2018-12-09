@@ -87,6 +87,18 @@ macro_rules! schemes {
         }
 
         impl<'scheme> Scheme<'scheme> {
+            /// Returns a new scheme which is identical but has a lifetime tied to this scheme.
+            pub fn as_borrowed(&self) -> Scheme {
+                use self::Scheme::*;
+
+                match self {
+                $(
+                    $variant => $variant,
+                )+
+                    Unregistered(scheme) => Unregistered(scheme.as_borrowed())
+                }
+            }
+
             /// Returns a `str` representation of the scheme.
             ///
             /// The case of the scheme will be lowercase if it was a registered scheme. Otherwise,
@@ -361,6 +373,22 @@ pub struct UnregisteredScheme<'scheme> {
 }
 
 impl UnregisteredScheme<'_> {
+    /// Returns a new unregistered scheme which is identical but has a lifetime tied to this
+    /// unregistered scheme.
+    pub fn as_borrowed(&self) -> UnregisteredScheme {
+        use self::Cow::*;
+
+        let scheme = match &self.scheme {
+            Borrowed(borrowed) => *borrowed,
+            Owned(owned) => owned.as_str(),
+        };
+
+        UnregisteredScheme {
+            normalized: self.normalized,
+            scheme: Cow::Borrowed(scheme),
+        }
+    }
+
     /// Returns a `str` representation of the scheme.
     ///
     /// The case-sensitivity of the original string is preserved.
