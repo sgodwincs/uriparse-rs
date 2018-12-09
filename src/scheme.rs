@@ -217,6 +217,33 @@ macro_rules! schemes {
 }
 
 impl Scheme<'_> {
+    /// Returns whether the scheme is normalized.
+    ///
+    /// A normalized scheme will be all lowercase. All standardized schemes are always considered
+    /// normalized regardless of what source they were parsed from.
+    ///
+    /// This function returns in constant-time.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Scheme;
+    ///
+    /// let scheme = Scheme::try_from("http").unwrap();
+    /// assert!(scheme.is_normalized());
+    ///
+    /// let scheme = Scheme::try_from("HTTP").unwrap();
+    /// assert!(scheme.is_normalized());
+    ///
+    /// let mut scheme = Scheme::try_from("MyScHeMe").unwrap();
+    /// assert!(!scheme.is_normalized());
+    /// scheme.normalize();
+    /// assert!(scheme.is_normalized());
+    /// ```
     pub fn is_normalized(&self) -> bool {
         match self {
             Scheme::Unregistered(scheme) => scheme.is_normalized(),
@@ -224,6 +251,25 @@ impl Scheme<'_> {
         }
     }
 
+    /// Normalizes the scheme so that it is all lowercase.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Scheme;
+    ///
+    /// let mut scheme = Scheme::try_from("http").unwrap();
+    /// scheme.normalize();
+    /// assert_eq!(scheme, "http");
+    ///
+    /// let mut scheme = Scheme::try_from("MyScHeMe").unwrap();
+    /// scheme.normalize();
+    /// assert_eq!(scheme, "myscheme");
+    /// ```
     pub fn normalize(&mut self) {
         if let Scheme::Unregistered(scheme) = self {
             scheme.normalize();
@@ -288,7 +334,7 @@ impl<'scheme> TryFrom<&'scheme [u8]> for Scheme<'scheme> {
         if rest.is_empty() {
             Ok(scheme)
         } else {
-            Err(InvalidScheme::ExpectedEOF)
+            Err(InvalidScheme::InvalidCharacter)
         }
     }
 }
@@ -307,7 +353,10 @@ impl<'scheme> TryFrom<&'scheme str> for Scheme<'scheme> {
 /// This is case-insensitive, and this is reflected in the equality and hash functions.
 #[derive(Clone, Debug)]
 pub struct UnregisteredScheme<'scheme> {
+    /// Whether the fragment is normalized.
     normalized: bool,
+
+    /// The internal scheme source that is either owned or borrowed.
     scheme: Cow<'scheme, str>,
 }
 
@@ -347,10 +396,52 @@ impl UnregisteredScheme<'_> {
         }
     }
 
+    /// Returns whether the scheme is normalized.
+    ///
+    /// A normalized scheme will be all lowercase.
+    ///
+    /// This function runs in constant-time.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::UnregisteredScheme;
+    ///
+    /// let scheme = UnregisteredScheme::try_from("myscheme").unwrap();
+    /// assert!(scheme.is_normalized());
+    ///
+    /// let mut scheme = UnregisteredScheme::try_from("MyScHeMe").unwrap();
+    /// assert!(!scheme.is_normalized());
+    /// scheme.normalize();
+    /// assert!(scheme.is_normalized());
+    /// ```
     pub fn is_normalized(&self) -> bool {
         self.normalized
     }
 
+    /// Normalizes the scheme so that it is all lowercase.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::UnregisteredScheme;
+    ///
+    /// let mut scheme = UnregisteredScheme::try_from("myscheme").unwrap();
+    /// scheme.normalize();
+    /// assert_eq!(scheme, "myscheme");
+    ///
+    /// let mut scheme = UnregisteredScheme::try_from("MyScHeMe").unwrap();
+    /// scheme.normalize();
+    /// assert_eq!(scheme, "myscheme");
+    /// ```
     pub fn normalize(&mut self) {
         if !self.normalized {
             normalize_string(&mut self.scheme.to_mut(), true);
@@ -450,13 +541,6 @@ pub enum InvalidScheme {
     /// The scheme component was empty.
     CannotBeEmpty,
 
-    /// This error occurs when the string from which the scheme is parsed is not entirely consumed
-    /// during the parsing. For example, parsing the string `"http:"` would generate
-    /// this error since `":"` would still be left over.
-    ///
-    /// This only applies to the [`Scheme::try_from`] functions.
-    ExpectedEOF,
-
     /// The scheme contained an invalid scheme character.
     InvalidCharacter,
 
@@ -476,7 +560,6 @@ impl Error for InvalidScheme {
 
         match self {
             CannotBeEmpty => "scheme cannot be empty",
-            ExpectedEOF => "expected EOF",
             InvalidCharacter => "invalid scheme character",
             MustStartWithAlphabetic => "scheme must start with alphabetic character",
         }
@@ -893,4 +976,34 @@ schemes! {
     (Z3950, "z39.50", SchemeStatus::Historical);
     (Z3950R, "z39.50r", SchemeStatus::Permanent);
     (Z3950S, "z39.50s", SchemeStatus::Permanent);
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_scheme_normalize() {
+        fn test_case(value: &str, expected: &str) {
+            let mut scheme = Scheme::try_from(value).unwrap();
+            scheme.normalize();
+            assert_eq!(scheme, expected);
+        }
+
+        test_case("http", "http");
+        test_case("SCHEME", "scheme");
+    }
+
+    #[test]
+    fn test_scheme_parse() {
+        use self::InvalidScheme::*;
+
+        assert_eq!(Scheme::try_from("scheme").unwrap(), "scheme");
+        assert_eq!(Scheme::try_from("HTTP").unwrap(), "http");
+        assert_eq!(Scheme::try_from("SCHEME").unwrap(), "SCHEME");
+
+        assert_eq!(Scheme::try_from(""), Err(CannotBeEmpty));
+        assert_eq!(Scheme::try_from("a:"), Err(InvalidCharacter));
+        assert_eq!(Scheme::try_from("1"), Err(MustStartWithAlphabetic));
+    }
 }
