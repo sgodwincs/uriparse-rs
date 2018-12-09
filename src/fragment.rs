@@ -110,7 +110,7 @@ impl Fragment<'_> {
     /// A normalized fragment will have no bytes that are in the unreserved character set
     /// percent-encoded and all alphabetical characters in percent-encodings will be uppercase.
     ///
-    /// This function returns in constant-time.
+    /// This function runs in constant-time.
     ///
     /// # Examples
     ///
