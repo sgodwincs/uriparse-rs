@@ -645,6 +645,10 @@ impl<'uri> URI<'uri> {
         self.uri_reference.query()
     }
 
+    /// Creates a new URI which is created by resolving the given reference against this URI.
+    ///
+    /// The algorithm used for resolving the reference is described in
+    /// [[RFC3986, Section 5.2.2](https://tools.ietf.org/html/rfc3986#section-5.2.2)].
     pub fn resolve(&self, reference: &'uri URIReference<'uri>) -> URI<'uri> {
         let mut builder = URIBuilder::new();
 
