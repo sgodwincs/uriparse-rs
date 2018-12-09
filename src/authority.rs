@@ -23,12 +23,6 @@
 //! While many components in this library support string comparison, [`Authority`] does not. This
 //! comes down to it just being too expensive to do a proper host comparison. To do so would require
 //! conversion to [`IpAddr`], which in the case of [`Ipv6Addr`] can be expensive.
-//!
-//! Some testing reveals that doing incremental parsing and equality of the host string for IP
-//! addresses allow for considerably faster checks. For example, a custom IPv4 parser I wrote
-//! performed ~2.5 faster than what the `std` uses. Part of this is that I have to find the end of
-//! the host before I can use the `std` parser. I may in the future allow [`Authority`] comparison
-//! with custom written IPv4/IPv6 address parsers.
 
 use std::borrow::Cow;
 use std::convert::TryFrom;
@@ -239,10 +233,29 @@ impl<'authority> Authority<'authority> {
     /// use uriparse::Authority;
     ///
     /// let authority = Authority::try_from("username:password@example.com").unwrap();
-    /// assert_eq!(authority.has_password(), true);
+    /// assert!(authority.has_password());
     /// ```
     pub fn has_password(&self) -> bool {
         self.password.is_some()
+    }
+
+    /// Returns whether there is a password in the authority as defined in
+    /// [[RFC3986, Section 3.2.1](https://tools.ietf.org/html/rfc3986#section-3.2.1)].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Authority;
+    ///
+    /// let authority = Authority::try_from("example.com:8080").unwrap();
+    /// assert!(authority.has_port());
+    /// ```
+    pub fn has_port(&self) -> bool {
+        self.port.is_some()
     }
 
     /// Returns whether there is a username in the authority as defined in
@@ -261,7 +274,7 @@ impl<'authority> Authority<'authority> {
     /// use uriparse::Authority;
     ///
     /// let authority = Authority::try_from("username@example.com").unwrap();
-    /// assert_eq!(authority.has_username(), true);
+    /// assert!(authority.has_username());
     /// ```
     pub fn has_username(&self) -> bool {
         self.username.is_some()
@@ -342,6 +355,45 @@ impl<'authority> Authority<'authority> {
         Option<u16>,
     ) {
         (self.username, self.password, self.host, self.port)
+    }
+
+    /// Returns whether the authority is normalized.
+    ///
+    /// A normalized authority will have all of its sub-components normalized.
+    ///
+    /// This function runs in constant-time.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Authority;
+    ///
+    /// let authority = Authority::try_from("username:password@example.com").unwrap();
+    /// assert!(authority.is_normalized());
+    ///
+    /// let mut authority = Authority::try_from("username:p%61ssword@EXAMPLE.COM").unwrap();
+    /// assert!(!authority.is_normalized());
+    /// authority.normalize();
+    /// assert!(authority.is_normalized());
+    /// ```
+    pub fn is_normalized(&self) -> bool {
+        if let Some(username) = self.username.as_ref() {
+            if !username.is_normalized() {
+                return false;
+            }
+        }
+
+        if let Some(password) = self.password.as_ref() {
+            if !password.is_normalized() {
+                return false;
+            }
+        }
+
+        self.host.is_normalized()
     }
 
     /// Maps the host using the given map function.
@@ -443,6 +495,28 @@ impl<'authority> Authority<'authority> {
             .expect("mapped username resulted in invalid state")
     }
 
+    /// Normalizes the authority.
+    ///
+    /// A normalized authority will have all of its sub-components normalized.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Authority;
+    ///
+    /// let mut authority = Authority::try_from("username:password@example.com").unwrap();
+    /// authority.normalize();
+    /// assert_eq!(authority.to_string(), "username:password@example.com");
+    ///
+    /// let mut authority = Authority::try_from("username:p%61ssword@EXAMPLE.COM").unwrap();
+    /// assert_eq!(authority.to_string(), "username:p%61ssword@EXAMPLE.COM");
+    /// authority.normalize();
+    /// assert_eq!(authority.to_string(), "username:password@example.com");
+    /// ```
     pub fn normalize(&mut self) {
         if let Some(username) = self.username.as_mut() {
             username.normalize();
@@ -700,8 +774,16 @@ impl<'authority> TryFrom<&'authority [u8]> for Authority<'authority> {
 
         if rest.is_empty() {
             Ok(authority)
+        } else if authority.has_port() {
+            Err(InvalidAuthority::InvalidPort(InvalidPort::InvalidCharacter))
+        } else if authority.host().is_ipv6_address() {
+            Err(InvalidAuthority::InvalidHost(
+                InvalidHost::InvalidIPv6Character,
+            ))
         } else {
-            Err(InvalidAuthority::ExpectedEOF)
+            Err(InvalidAuthority::InvalidHost(
+                InvalidHost::InvalidIPv4OrRegisteredNameCharacter,
+            ))
         }
     }
 }
@@ -718,17 +800,17 @@ impl<'authority> TryFrom<&'authority str> for Authority<'authority> {
 /// [[RFC3986, Section 3.2.2](https://tools.ietf.org/html/rfc3986#section-3.2.2)].
 ///
 /// The RFC mentions support for future IP address literals. Of course, as of this moment there
-/// exist none, so hosts of the form `"[v*...]"` where `'*'` is a hexadecimal digit and `'...'` is the
-/// actual IP literal are not considered valid.
+/// exist none, so hosts of the form `"[v*...]"` where `'*'` is a hexadecimal digit and `'...'` is
+/// the actual IP literal are not considered valid.
 ///
 /// Also, the host is case-insensitive meaning that `"example.com"` and `"ExAmPlE.CoM"` refer to the
-/// same host. Furthermore, percent-encoding plays no role in equality checking meaning that
-/// `"example.com"` and `"exampl%65.com"` also refer to the same host. Both of these attributes are
-/// reflected in the equality and hash functions.
+/// same host. Furthermore, percent-encoding plays no role in equality checking for characters in
+/// the unreserved character set meaning that `"example.com"` and `"ex%61mple.com"` are identical.
+/// Both of these attributes are reflected in the equality and hash functions.
 ///
 /// However, be aware that just because percent-encoding plays no role in equality checking does not
-/// mean that the host is normalized. The original host string (in the case of a registered name)
-/// will always be preserved as is with no normalization performed.
+/// mean that the host is normalized. If the host needs to be normalized, use the
+/// [`Host::normalize`] function.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Host<'host> {
     /// An IPv4 address. Based on the `std`'s implementation, leading zeros for octets are allowed
@@ -749,6 +831,17 @@ pub enum Host<'host> {
 }
 
 impl Host<'_> {
+    /// Returns a new host which is identical but has a lifetime tied to this host.
+    pub fn as_borrowed(&self) -> Host {
+        use self::Host::*;
+
+        match self {
+            IPv4Address(ipv4) => IPv4Address(ipv4.clone()),
+            IPv6Address(ipv6) => IPv6Address(ipv6.clone()),
+            RegisteredName(name) => RegisteredName(name.as_borrowed()),
+        }
+    }
+
     /// Returns whether the host is an IPv4 address.
     ///
     /// # Examples
@@ -791,6 +884,31 @@ impl Host<'_> {
         }
     }
 
+    /// Returns whether the host is normalized.
+    ///
+    /// IPv4 and IPv6 hosts will always be normalized. Registered names are considered normalized
+    /// if all characters are lowercase, no bytes that are in the unreserved character set are
+    /// percent-encoded, and all alphabetical characters in percent-encodings are uppercase.
+    ///
+    /// This function runs in constant-time.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Host;
+    ///
+    /// let host = Host::try_from("192.168.1.1").unwrap();
+    /// assert!(host.is_normalized());
+    ///
+    /// let mut host = Host::try_from("EXAMPLE.COM").unwrap();
+    /// assert!(!host.is_normalized());
+    /// host.normalize();
+    /// assert!(host.is_normalized());
+    /// ```
     pub fn is_normalized(&self) -> bool {
         match self {
             Host::RegisteredName(name) => name.is_normalized(),
@@ -819,6 +937,34 @@ impl Host<'_> {
         }
     }
 
+    /// Normalizes the fragment such that all characters are lowercase, no bytes that are in the
+    /// unreserved character set are percent-encoded, and all alphabetical characters in
+    /// percent-encodings are uppercase.
+    ///
+    /// If the host is already normalized, the function will return immediately. Otherwise, if
+    /// the host is not owned, this function will perform an allocation to clone it. The
+    /// normalization itself though, is done in-place with no extra memory allocations required.
+    ///
+    /// IPv4 and IPv6 hosts are always considered normalized.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Host;
+    ///
+    /// let mut host = Host::try_from("192.168.1.1").unwrap();
+    /// host.normalize();
+    /// assert_eq!(host.to_string(), "192.168.1.1");
+    ///
+    /// let mut host = Host::try_from("%ff%41").unwrap();
+    /// assert_eq!(host.to_string(), "%ff%41");
+    /// host.normalize();
+    /// assert_eq!(host.to_string(), "%FFA");
+    /// ```
     pub fn normalize(&mut self) {
         match self {
             Host::RegisteredName(name) => name.normalize(),
@@ -956,21 +1102,24 @@ impl<'host> TryFrom<&'host str> for Host<'host> {
 /// Even though this library supports parsing the password from the user information, it should be
 /// noted that the format "username:password" is deprecated. Also, be careful logging this!
 ///
-/// The password is case-sensitive. However, percent-encoding plays no role in equality checking
-/// meaning that `"password"` and `"p%61ssword"` refer to the same password. Both of these
-/// attributes are reflected in the equality and hash functions.
+/// The password is case-sensitive. Furthermore, percent-encoding plays no role in equality checking
+/// for characters in the unreserved character set meaning that `"password"` and `"p%61ssword"` are
+/// identical. Both of these attributes are reflected in the equality and hash functions.
 ///
-/// sBe aware that just because percent-encoding plays no role in equality checking does not
-/// mean that the password is normalized. The original password string will always be preserved as
-/// is with no normalization performed. You should perform percent-encoding normalization if you
-/// want to use the password for any sort of authentication (not recommended).
+/// Be aware that just because percent-encoding plays no role in equality checking does not
+/// mean that the password is normalized. If the password needs to be normalized, use the
+/// [`Password::normalize`] function.
 #[derive(Clone, Debug)]
 pub struct Password<'password> {
+    /// Whether the fragment is normalized.
     normalized: bool,
+
+    /// The internal password source that is either owned or borrowed.
     password: Cow<'password, str>,
 }
 
 impl Password<'_> {
+    /// Returns a new password which is identical but has a lifetime tied to this password.
     pub fn as_borrowed(&self) -> Password {
         use self::Cow::*;
 
@@ -1018,10 +1167,59 @@ impl Password<'_> {
         }
     }
 
+    /// Returns whether the password is normalized.
+    ///
+    /// A normalized password will have no bytes that are in the unreserved character set
+    /// percent-encoded and all alphabetical characters in percent-encodings will be uppercase.
+    ///
+    /// This function runs in constant-time.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Password;
+    ///
+    /// let password = Password::try_from("password").unwrap();
+    /// assert!(password.is_normalized());
+    ///
+    /// let mut password = Password::try_from("%ff%ff").unwrap();
+    /// assert!(!password.is_normalized());
+    /// password.normalize();
+    /// assert!(password.is_normalized());
+    /// ```
     pub fn is_normalized(&self) -> bool {
         self.normalized
     }
 
+    /// Normalizes the password such that it will have no bytes that are in the unreserved character
+    /// set percent-encoded and all alphabetical characters in percent-encodings will be uppercase.
+    ///
+    /// If the password is already normalized, the function will return immediately. Otherwise, if
+    /// the password is not owned, this function will perform an allocation to clone it. The
+    /// normalization itself though, is done in-place with no extra memory allocations required.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Password;
+    ///
+    /// let mut password = Password::try_from("password").unwrap();
+    /// password.normalize();
+    /// assert_eq!(password, "password");
+    ///
+    /// let mut password = Password::try_from("%ff%41").unwrap();
+    /// assert_eq!(password, "%ff%41");
+    /// password.normalize();
+    /// assert_eq!(password, "%FFA");
+    /// ```
     pub fn normalize(&mut self) {
         if !self.normalized {
             normalize_string(&mut self.password.to_mut(), true);
@@ -1149,21 +1347,27 @@ impl<'password> TryFrom<&'password str> for Password<'password> {
 
 /// A host that is a registered name (i.e. not an IP literal).
 ///
-/// The host is case-insensitive meaning that `"example.com"` and `"ExAmPlE.CoM"` refer to the same
-/// host. Furthermore, percent-encoding plays no role in equality checking meaning that
-///`"example.com"` and `"exampl%65.com"` also refer to the same host. Both of these attributes are
-/// reflected in the equality and hash functions.
+/// The registered name is case-insensitive meaning that `"example.com"` and `"ExAmPlE.CoM"` refer
+/// to the same registered name. Furthermore, percent-encoding plays no role in equality checking
+/// for characters in the unreserved character set meaning that `"example.com"` and
+/// `"ex%61mple.com"` are identical. Both of these attributes are reflected in the equality and hash
+/// functions.
 ///
 /// However, be aware that just because percent-encoding plays no role in equality checking does not
-/// mean that the host is normalized. The original host string will always be preserved as is with
-/// no normalization performed.
+/// mean that the host is normalized. If the registered name needs to be normalized, use the
+/// [`RegisteredName::normalize`] function.
 #[derive(Clone, Debug)]
 pub struct RegisteredName<'name> {
+    /// Whether the fragment is normalized.
     normalized: bool,
+
+    /// The internal registered name source that is either owned or borrowed.
     registered_name: Cow<'name, str>,
 }
 
 impl RegisteredName<'_> {
+    /// Returns a new registered name which is identical but has a lifetime tied to this registered
+    /// name.
     pub fn as_borrowed(&self) -> RegisteredName {
         use self::Cow::*;
 
@@ -1178,10 +1382,32 @@ impl RegisteredName<'_> {
         }
     }
 
+    /// Returns a `str` representation of the fragment.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Fragment;
+    ///
+    /// let fragment = Fragment::try_from("fragment").unwrap();
+    /// assert_eq!(fragment.as_str(), "fragment");
+    /// ```
     pub fn as_str(&self) -> &str {
         &self.registered_name
     }
 
+    /// Converts the [`RegisteredName`] into an owned copy.
+    ///
+    /// If you construct the registered name from a source with a non-static lifetime, you may run
+    /// into lifetime problems due to the way the struct is designed. Calling this function will
+    /// ensure that the returned value has a static lifetime.
+    ///
+    /// This is different from just cloning. Cloning the registered name will just copy the
+    /// references, and thus the lifetime will remain the same.
     pub fn into_owned(self) -> RegisteredName<'static> {
         RegisteredName {
             normalized: self.normalized,
@@ -1189,10 +1415,62 @@ impl RegisteredName<'_> {
         }
     }
 
+    /// Returns whether the registered name is normalized.
+    ///
+    /// Registered names are considered normalized if all characters are lowercase, no bytes that
+    /// are in the unreserved character set are percent-encoded, and all alphabetical characters in
+    /// percent-encodings are uppercase.
+    ///
+    /// This function runs in constant-time.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::RegisteredName;
+    ///
+    /// let name = RegisteredName::try_from("example.com").unwrap();
+    /// assert!(name.is_normalized());
+    ///
+    /// let mut name = RegisteredName::try_from("EXAMPLE.COM").unwrap();
+    /// assert!(!name.is_normalized());
+    /// name.normalize();
+    /// assert!(name.is_normalized());
+    /// ```
     pub fn is_normalized(&self) -> bool {
         self.normalized
     }
 
+    /// Normalizes the fragment such that all characters are lowercase, no bytes that are in the
+    /// unreserved character set are percent-encoded, and all alphabetical characters in
+    /// percent-encodings are uppercase.
+    ///
+    /// If the registered name is already normalized, the function will return immediately.
+    /// Otherwise, if the registered name is not owned, this function will perform an allocation to
+    /// clone it. The normalization itself though, is done in-place with no extra memory allocations
+    /// required.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::RegisteredName;
+    ///
+    /// let mut name = RegisteredName::try_from("example.com").unwrap();
+    /// name.normalize();
+    /// assert_eq!(name.to_string(), "example.com");
+    ///
+    /// let mut name = RegisteredName::try_from("%ff%41").unwrap();
+    /// assert_eq!(name.to_string(), "%ff%41");
+    /// name.normalize();
+    /// assert_eq!(name.to_string(), "%FFA");
+    /// ```
     pub fn normalize(&mut self) {
         if !self.normalized {
             normalize_string(&mut self.registered_name.to_mut(), false);
@@ -1316,20 +1594,24 @@ impl<'name> TryFrom<&'name str> for RegisteredName<'name> {
 /// The username component of the authority as defined in
 /// [[RFC3986, Section 3.2.1](https://tools.ietf.org/html/rfc3986#section-3.2.1)].
 ///
-/// The username is case-sensitive. However, percent-encoding plays no role in equality checking
-/// meaning that `"username"` and `"usern%61me"` refer to the same username. Both of these
-/// attributes are reflected in the equality and hash functions.
+/// The username is case-sensitive. Furthermore, percent-encoding plays no role in equality checking
+/// for characters in the unreserved character set meaning that `"username"` and `"usern%61me"` are
+/// identical. Both of these attributes are reflected in the equality and hash functions.
 ///
 /// Be aware that just because percent-encoding plays no role in equality checking does not
-/// mean that the username is normalized. The original username string will always be preserved as
-/// is with no normalization performed.
+/// mean that the username is normalized. If the username needs to be normalized, use the
+/// [`Username::normalize`] function.
 #[derive(Clone, Debug)]
 pub struct Username<'username> {
+    /// Whether the username is normalized.
     normalized: bool,
+
+    /// The internal username source that is either owned or borrowed.
     username: Cow<'username, str>,
 }
 
 impl Username<'_> {
+    /// Returns a new username which is identical but has a lifetime tied to this username.
     pub fn as_borrowed(&self) -> Username {
         use self::Cow::*;
 
@@ -1344,10 +1626,32 @@ impl Username<'_> {
         }
     }
 
+    /// Returns a `str` representation of the username.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Username;
+    ///
+    /// let username = Username::try_from("username").unwrap();
+    /// assert_eq!(username.as_str(), "username");
+    /// ```
     pub fn as_str(&self) -> &str {
         &self.username
     }
 
+    /// Converts the [`Username`] into an owned copy.
+    ///
+    /// If you construct the username from a source with a non-static lifetime, you may run into
+    /// lifetime problems due to the way the struct is designed. Calling this function will ensure
+    /// that the returned value has a static lifetime.
+    ///
+    /// This is different from just cloning. Cloning the username will just copy the references, and
+    /// thus the lifetime will remain the same.
     pub fn into_owned(self) -> Username<'static> {
         Username {
             normalized: self.normalized,
@@ -1355,6 +1659,59 @@ impl Username<'_> {
         }
     }
 
+    /// Returns whether the username is normalized.
+    ///
+    /// A normalized username will have no bytes that are in the unreserved character set
+    /// percent-encoded and all alphabetical characters in percent-encodings will be uppercase.
+    ///
+    /// This function runs in constant-time.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Username;
+    ///
+    /// let username = Username::try_from("username").unwrap();
+    /// assert!(username.is_normalized());
+    ///
+    /// let mut username = Username::try_from("%ff%ff").unwrap();
+    /// assert!(!username.is_normalized());
+    /// username.normalize();
+    /// assert!(username.is_normalized());
+    /// ```
+    pub fn is_normalized(&self) -> bool {
+        self.normalized
+    }
+
+    /// Normalizes the username such that it will have no bytes that are in the unreserved character
+    /// set percent-encoded and all alphabetical characters in percent-encodings will be uppercase.
+    ///
+    /// If the username is already normalized, the function will return immediately. Otherwise, if
+    /// the username is not owned, this function will perform an allocation to clone it. The
+    /// normalization itself though, is done in-place with no extra memory allocations required.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(try_from)]
+    /// #
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::Username;
+    ///
+    /// let mut username = Username::try_from("username").unwrap();
+    /// username.normalize();
+    /// assert_eq!(username, "username");
+    ///
+    /// let mut username = Username::try_from("%ff%41").unwrap();
+    /// assert_eq!(username, "%ff%41");
+    /// username.normalize();
+    /// assert_eq!(username, "%FFA");
+    /// ```
     pub fn normalize(&mut self) {
         if !self.normalized {
             normalize_string(&mut self.username.to_mut(), true);
@@ -1484,13 +1841,6 @@ impl<'username> TryFrom<&'username str> for Username<'username> {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum InvalidAuthority {
-    /// This error occurs when the string from which the authority is parsed is not entirely
-    /// consumed during the parsing. For example, parsing the string `"example.com/"` would generate
-    /// this error since `"/"` would still be left over.
-    ///
-    /// This only applies to the [`Authority::try_from`] functions.
-    ExpectedEOF,
-
     /// The host component of the authority was invalid.
     InvalidHost(InvalidHost),
 
@@ -1512,7 +1862,6 @@ impl Error for InvalidAuthority {
         use self::InvalidAuthority::*;
 
         match self {
-            ExpectedEOF => "expected end of file",
             InvalidHost(invalid_host) => invalid_host.description(),
             InvalidPort(invalid_port) => invalid_port.description(),
             InvalidUserInfo(invalid_user_info) => invalid_user_info.description(),
