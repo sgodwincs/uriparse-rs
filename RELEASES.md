@@ -1,3 +1,29 @@
+# 0.4.0
+
+ - Add new schemes:
+   * calculator
+   * ms-calculator
+ - Fix typo in `ms-drive-to` scheme variant name.
+ - Fix two duplicates in schemes: `aaas` and `tag`.
+ - Fix percent encoding equality and hash implementations. Percent encoding comparison is now only
+   done for characters in the unreserved set. An example of what would have passed before, but does
+   not now is comparing the following two URIs:
+
+   `http://example.com/#/`
+   `http://example.com/#%2F`
+
+   This is because while `/` is an allowed character in the fragment component, it is not in the
+   unreserved character set and so percent decoding is not guaranteed to be a "safe" operation. It
+   could be fine in a lot of protocols, but it may fail in another protocol that assigns a special
+   meaning to `/` in the fragment component.
+ - Fixed bug where parsing a username directly from a byte source would allow the username to
+   contain colons.
+ - Fixed bug where parsing a query directly from source containing percent-encoded characters would
+   return the wrong query.
+ - Added normalization for all components.
+ - References can now be resolved against URIs.
+ - Add missing `has_port` function to authority, URI, RelativeReference, and URIReference.
+
 # 0.3.3
 
  - Add new schemes:
@@ -27,7 +53,7 @@ path.push("test");
 assert_eq!(path, "/test"); // Before, the path would have been `"//test"`.
 ```
 
-   But the ability to make paths with a `"//"` prefix is still possible:
+   But the ability to make paths with a `//` prefix is still possible:
 
 ```rust
 let mut path = Path::try_from("/").unwrap();
