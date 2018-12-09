@@ -73,13 +73,10 @@ As stated in the goals section, this crate aims to be able to efficiently parse 
 
 ## Normalization
 
-As of this moment, this crate does not provide any means to perform normalization. This includes percent encoding normalization, path segment normalization (i.e `'.'` and `".."` are not handled), and any scheme/protocol-based normalization.
+This crate, by default, does not perform any normalization. However, the user can normalize components after parsing either individually or all at once using the provided `normalize` functions on the corresponding components. The normalizations provided are case normalization, percent-encoding normalization, and path segment normalization.
 
-However, when comparing components, percent encoding normalization is taken into consideration. For example, if you were to compare the two paths `/my/path` and `/my/p%61th`, they would be considered equal by this crate. It is done similarly with respect to hashing as well.
+However, when comparing components, percent-encoding normalization is taken into consideration. For example, if you were to compare the two paths `/my/path` and `/my/p%61th`, they would be considered equal by this crate. It is done similarly with respect to hashing as well.
 
 ## Query String
 
 This crate does not do query string parsing, it will simply make sure that it is a valid query string as defined by [[RFC3986, Section 3.4]](https://tools.ietf.org/html/rfc3986#section-3.4). You will need to use another crate (e.g. [queryst](https://github.com/rustless/queryst)) if you want it parsed.
-
-## TODO
- - Add support for percent-encoding and path normalizations.
