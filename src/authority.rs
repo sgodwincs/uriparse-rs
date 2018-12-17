@@ -41,7 +41,7 @@ use crate::utility::{
 
 /// A map of byte characters that determines if a character is a valid IPv4 or registered name
 /// character.
-#[cfg_attr(rustfmt, rustfmt_skip)]
+#[rustfmt::skip]
 const IPV4_AND_REGISTERED_NAME_CHAR_MAP: [u8; 256] = [
  // 0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F
     0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0, // 0
@@ -63,7 +63,7 @@ const IPV4_AND_REGISTERED_NAME_CHAR_MAP: [u8; 256] = [
 ];
 
 /// A map of byte characters that determines if a character is a valid future IP literal character.
-#[cfg_attr(rustfmt, rustfmt_skip)]
+#[rustfmt::skip]
 const IPV_FUTURE_CHAR_MAP: [u8; 256] = [
  // 0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F
     0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0, // 0
@@ -85,7 +85,7 @@ const IPV_FUTURE_CHAR_MAP: [u8; 256] = [
 ];
 
 /// A map of byte characters that determines if a character is a valid user information character.
-#[cfg_attr(rustfmt, rustfmt_skip)]
+#[rustfmt::skip]
 const USER_INFO_CHAR_MAP: [u8; 256] = [
  // 0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F
     0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0, // 0
@@ -836,8 +836,8 @@ impl Host<'_> {
         use self::Host::*;
 
         match self {
-            IPv4Address(ipv4) => IPv4Address(ipv4.clone()),
-            IPv6Address(ipv6) => IPv6Address(ipv6.clone()),
+            IPv4Address(ipv4) => IPv4Address(*ipv4),
+            IPv6Address(ipv6) => IPv6Address(*ipv6),
             RegisteredName(name) => RegisteredName(name.as_borrowed()),
         }
     }
@@ -966,9 +966,8 @@ impl Host<'_> {
     /// assert_eq!(host.to_string(), "%FFA");
     /// ```
     pub fn normalize(&mut self) {
-        match self {
-            Host::RegisteredName(name) => name.normalize(),
-            _ => (),
+        if let Host::RegisteredName(name) = self {
+            name.normalize()
         }
     }
 }
@@ -2060,9 +2059,8 @@ fn check_ipv6(value: &[u8]) -> bool {
 /// ensures that percent encodings are valid.
 fn check_ipvfuture(value: &[u8]) -> bool {
     for &byte in value {
-        match IPV_FUTURE_CHAR_MAP[byte as usize] {
-            0 => return false,
-            _ => (),
+        if let 0 = IPV_FUTURE_CHAR_MAP[byte as usize] {
+            return false;
         }
     }
 
@@ -2095,9 +2093,7 @@ fn check_user_info(value: &[u8], is_username: bool) -> Result<bool, InvalidUserI
 }
 
 /// Parses the authority from the given byte string.
-pub(crate) fn parse_authority<'authority>(
-    value: &'authority [u8],
-) -> Result<(Authority<'authority>, &'authority [u8]), InvalidAuthority> {
+pub(crate) fn parse_authority(value: &[u8]) -> Result<(Authority, &[u8]), InvalidAuthority> {
     let mut at_index = None;
     let mut last_colon_index = None;
     let mut end_index = value.len();
@@ -2161,7 +2157,7 @@ fn parse_port(value: &[u8]) -> Result<Option<u16>, InvalidPort> {
 
             port = port.checked_mul(10).ok_or(InvalidPort::Overflow)?;
             port = port
-                .checked_add((byte - b'0') as u16)
+                .checked_add((byte - b'0').into())
                 .ok_or(InvalidPort::Overflow)?;
         }
 
@@ -2170,9 +2166,7 @@ fn parse_port(value: &[u8]) -> Result<Option<u16>, InvalidPort> {
 }
 
 /// Parses the user information from the given byte string.
-fn parse_user_info<'user_info>(
-    value: &'user_info [u8],
-) -> Result<(Username<'user_info>, Option<Password<'user_info>>), InvalidUserInfo> {
+fn parse_user_info(value: &[u8]) -> Result<(Username, Option<Password>), InvalidUserInfo> {
     let mut bytes = value.iter().enumerate();
     let mut first_colon_index = None;
     let mut password_normalized = true;

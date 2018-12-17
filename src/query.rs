@@ -20,7 +20,7 @@ use crate::utility::{
 };
 
 /// A map of byte characters that determines if a character is a valid query character.
-#[cfg_attr(rustfmt, rustfmt_skip)]
+#[rustfmt::skip]
 const QUERY_CHAR_MAP: [u8; 256] = [
  // 0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F
     0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0, // 0
@@ -324,9 +324,7 @@ impl From<!> for InvalidQuery {
 }
 
 /// Parses the query from the given byte string.
-pub(crate) fn parse_query<'query>(
-    value: &'query [u8],
-) -> Result<(Query<'query>, &'query [u8]), InvalidQuery> {
+pub(crate) fn parse_query(value: &[u8]) -> Result<(Query, &[u8]), InvalidQuery> {
     let mut bytes = value.iter();
     let mut end_index = 0;
     let mut normalized = true;

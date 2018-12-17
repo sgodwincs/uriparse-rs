@@ -16,7 +16,7 @@ use crate::utility::{
 };
 
 /// A map of byte characters that determines if a character is a valid path character.
-#[cfg_attr(rustfmt, rustfmt_skip)]
+#[rustfmt::skip]
 const PATH_CHAR_MAP: [u8; 256] = [
  // 0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F
     0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0, // 0
@@ -216,7 +216,7 @@ impl<'path> Path<'path> {
     /// function is **not** valid!
     pub(crate) unsafe fn new_with_no_segments(absolute: bool) -> Path<'static> {
         Path {
-            absolute: absolute,
+            absolute,
             double_dot_segment_count: 0,
             leading_double_dot_segment_count: 0,
             segments: Vec::new(),
@@ -662,7 +662,7 @@ impl PartialEq<[u8]> for Path<'_> {
             }
         }
 
-        return true;
+        true
     }
 }
 
@@ -1115,9 +1115,8 @@ impl From<!> for InvalidPath {
 }
 
 /// Parses the path from the given byte string.
-pub(crate) fn parse_path<'path>(
-    value: &'path [u8],
-) -> Result<(Path<'path>, &'path [u8]), InvalidPath> {
+pub(crate) fn parse_path(value: &[u8]) -> Result<(Path, &[u8]), InvalidPath> {
+    #[allow(clippy::too_many_arguments)]
     fn new_segment<'segment>(
         segment: &'segment [u8],
         index: u16,

@@ -1,3 +1,5 @@
+#![allow(clippy::string_lit_as_bytes)]
+
 //! Scheme Component
 //!
 //! See [[RFC3986, Section 3.5](https://tools.ietf.org/html/rfc3986#section-3.5)]. For a list of
@@ -24,7 +26,7 @@ const MAX_REGISTERED_SCHEME_LENGTH: usize = 36;
 const NUMBER_OF_SCHEMES: usize = 291;
 
 /// A map of byte characters that determines if a character is a valid scheme character.
-#[cfg_attr(rustfmt, rustfmt_skip)]
+#[rustfmt::skip]
 const SCHEME_CHAR_MAP: [u8; 256] = [
  // 0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F
     0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0, // 0
@@ -173,7 +175,7 @@ macro_rules! schemes {
 
         /// Parses the scheme from the given byte string.
         pub(crate) fn parse_scheme(value: &[u8]) -> Result<(Scheme, &[u8]), InvalidScheme> {
-            fn unregistered_scheme<'bytes>(value: &'bytes [u8], normalized: bool) -> Scheme<'bytes> {
+            fn unregistered_scheme(value: &[u8], normalized: bool) -> Scheme {
                 // Unsafe: The loop below makes sure this is safe.
 
                 let scheme = unsafe { str::from_utf8_unchecked(value) };
@@ -647,7 +649,7 @@ impl SchemeStatus {
     /// assert_eq!(Scheme::Fax.status().is_historical(), true);
     /// assert_eq!(Scheme::HTTP.status().is_historical(), false);
     /// ```
-    pub fn is_historical(&self) -> bool {
+    pub fn is_historical(self) -> bool {
         match self {
             SchemeStatus::Historical => true,
             _ => false,
@@ -664,7 +666,7 @@ impl SchemeStatus {
     /// assert_eq!(Scheme::HTTP.status().is_permanent(), true);
     /// assert_eq!(Scheme::IRC.status().is_permanent(), false);
     /// ```
-    pub fn is_permanent(&self) -> bool {
+    pub fn is_permanent(self) -> bool {
         match self {
             SchemeStatus::Permanent => true,
             _ => false,
@@ -681,7 +683,7 @@ impl SchemeStatus {
     /// assert_eq!(Scheme::Git.status().is_provisional(), true);
     /// assert_eq!(Scheme::RTSP.status().is_provisional(), false);
     /// ```
-    pub fn is_provisional(&self) -> bool {
+    pub fn is_provisional(self) -> bool {
         match self {
             SchemeStatus::Provisional => true,
             _ => false,
@@ -703,7 +705,7 @@ impl SchemeStatus {
     /// assert_eq!(scheme.status().is_unregistered(), true);
     /// assert_eq!(Scheme::HTTPS.status().is_unregistered(), false);
     /// ```
-    pub fn is_unregistered(&self) -> bool {
+    pub fn is_unregistered(self) -> bool {
         match self {
             SchemeStatus::Unregistered => true,
             _ => false,
