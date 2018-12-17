@@ -937,7 +937,7 @@ impl Host<'_> {
         }
     }
 
-    /// Normalizes the fragment such that all characters are lowercase, no bytes that are in the
+    /// Normalizes the host such that all characters are lowercase, no bytes that are in the
     /// unreserved character set are percent-encoded, and all alphabetical characters in
     /// percent-encodings are uppercase.
     ///
@@ -1111,7 +1111,7 @@ impl<'host> TryFrom<&'host str> for Host<'host> {
 /// [`Password::normalize`] function.
 #[derive(Clone, Debug)]
 pub struct Password<'password> {
-    /// Whether the fragment is normalized.
+    /// Whether the password is normalized.
     normalized: bool,
 
     /// The internal password source that is either owned or borrowed.
@@ -1358,7 +1358,7 @@ impl<'password> TryFrom<&'password str> for Password<'password> {
 /// [`RegisteredName::normalize`] function.
 #[derive(Clone, Debug)]
 pub struct RegisteredName<'name> {
-    /// Whether the fragment is normalized.
+    /// Whether the registered name is normalized.
     normalized: bool,
 
     /// The internal registered name source that is either owned or borrowed.
@@ -1382,7 +1382,7 @@ impl RegisteredName<'_> {
         }
     }
 
-    /// Returns a `str` representation of the fragment.
+    /// Returns a `str` representation of the registered name.
     ///
     /// # Examples
     ///
@@ -1391,10 +1391,10 @@ impl RegisteredName<'_> {
     /// #
     /// use std::convert::TryFrom;
     ///
-    /// use uriparse::Fragment;
+    /// use uriparse::RegisteredName;
     ///
-    /// let fragment = Fragment::try_from("fragment").unwrap();
-    /// assert_eq!(fragment.as_str(), "fragment");
+    /// let name = RegisteredName::try_from("example.com").unwrap();
+    /// assert_eq!(name.as_str(), "example.com");
     /// ```
     pub fn as_str(&self) -> &str {
         &self.registered_name
@@ -1444,8 +1444,8 @@ impl RegisteredName<'_> {
         self.normalized
     }
 
-    /// Normalizes the fragment such that all characters are lowercase, no bytes that are in the
-    /// unreserved character set are percent-encoded, and all alphabetical characters in
+    /// Normalizes the registered name such that all characters are lowercase, no bytes that are in
+    /// the unreserved character set are percent-encoded, and all alphabetical characters in
     /// percent-encodings are uppercase.
     ///
     /// If the registered name is already normalized, the function will return immediately.
