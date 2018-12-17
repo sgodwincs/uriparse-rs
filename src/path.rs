@@ -47,7 +47,7 @@ const PATH_CHAR_MAP: [u8; 256] = [
 ///
 /// Each segment in the path is case-sensitive. Furthermore, percent-encoding plays no role in
 /// equality checking for characters in the unreserved character set meaning that `"segment"` and
-/// `"s%65gment"` identical. Both of these attributes are reflected in the equality and hash
+/// `"s%65gment"` are identical. Both of these attributes are reflected in the equality and hash
 /// functions.
 ///
 /// However, be aware that just because percent-encoding plays no role in equality checking does not
@@ -229,7 +229,7 @@ impl<'path> Path<'path> {
     ///
     /// There are two components to path normalization, the normalization of each segment
     /// individually and the removal of unnecessary dot segments. It is also guaranteed that whether
-    /// the path is absolute will not change due to normalization.
+    /// the path is absolute will not change as a result of normalization.
     ///
     /// The normalization of each segment will proceed according to [`Segment::normalize`].
     ///
@@ -551,12 +551,8 @@ impl<'path> Path<'path> {
     /// use uriparse::{Path, Segment};
     ///
     /// let mut path = Path::try_from("/my/path").unwrap();
-    ///
-    /// // TODO: Remove this block once NLL is stable.
-    /// {
-    ///     let mut segments = path.segments_mut();
-    ///     segments[1] = Segment::try_from("test").unwrap();
-    /// }
+    /// let mut segments = path.segments_mut();
+    /// segments[1] = Segment::try_from("test").unwrap();
     ///
     /// assert_eq!(path, "/my/test");
     /// ```
