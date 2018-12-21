@@ -1937,6 +1937,12 @@ impl Error for InvalidHost {
     }
 }
 
+impl From<!> for InvalidHost {
+    fn from(value: !) -> Self {
+        value
+    }
+}
+
 /// An error representing an invalid port.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
@@ -1962,6 +1968,12 @@ impl Error for InvalidPort {
             InvalidCharacter => "invalid port character",
             Overflow => "port overflow",
         }
+    }
+}
+
+impl From<!> for InvalidPort {
+    fn from(value: !) -> Self {
+        value
     }
 }
 
@@ -2016,6 +2028,12 @@ impl Error for InvalidUserInfo {
             InvalidPercentEncoding => "invalid user info percent encoding",
             UsernameCannotContainColon => "username cannot contain a colon character",
         }
+    }
+}
+
+impl From<!> for InvalidUserInfo {
+    fn from(value: !) -> Self {
+        value
     }
 }
 
