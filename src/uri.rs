@@ -504,7 +504,7 @@ impl<'uri> URI<'uri> {
     /// #
     /// use std::convert::TryFrom;
     ///
-    /// use uriparse::{Authority, URI};
+    /// use uriparse::URI;
     ///
     /// let mut uri = URI::try_from("http://example.com").unwrap();
     /// uri.map_path(|mut path| {

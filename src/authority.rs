@@ -1904,13 +1904,13 @@ pub enum InvalidHost {
     /// were valid, but there was an invalid percent encoding (e.g. `"%ZZ"`).
     InvalidIPv4OrRegisteredNameCharacter,
 
-    /// The syntax for an IPv6 literal was used (i.e. `"[...]"`) and all of the characters were
-    /// valid IPv6 characters. However, the format of the literal was invalid.
-    InvalidIPv6Format,
-
     /// The syntax for an IPv6 literal was used (i.e. `"[...]"`), but it contained an invalid IPv6
     /// character.
     InvalidIPv6Character,
+
+    /// The syntax for an IPv6 literal was used (i.e. `"[...]"`) and all of the characters were
+    /// valid IPv6 characters. However, the format of the literal was invalid.
+    InvalidIPv6Format,
 
     /// The syntax for a future IP literal was used (i.e. `"[v*...]"` where `"*"` is a hexadecimal
     /// digit), but it contained an invalid character.
@@ -1930,8 +1930,8 @@ impl Error for InvalidHost {
         match self {
             AddressMechanismNotSupported => "address mechanism not supported",
             InvalidIPv4OrRegisteredNameCharacter => "invalid IPv4 or registered name character",
-            InvalidIPv6Format => "invalid IPv6 format",
             InvalidIPv6Character => "invalid IPv6 character",
+            InvalidIPv6Format => "invalid IPv6 format",
             InvalidIPvFutureCharacter => "invalid IPvFuture character",
         }
     }
