@@ -1022,7 +1022,7 @@ impl<'uri> RelativeReferenceBuilder<'uri> {
 }
 
 /// An error representing an invalid relative reference.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum InvalidRelativeReference {
     /// Represents the case where there is no authority, but the first path segment starts with

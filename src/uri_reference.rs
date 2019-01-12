@@ -1457,7 +1457,7 @@ impl<'uri> URIReferenceBuilder<'uri> {
 }
 
 /// An error representing an invalid URI reference.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum InvalidURIReference {
     /// Represents the case when there is no authority, but the first path segment starts with
