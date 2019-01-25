@@ -1116,38 +1116,57 @@ impl From<!> for InvalidPath {
 
 /// Parses the path from the given byte string.
 pub(crate) fn parse_path(value: &[u8]) -> Result<(Path, &[u8]), InvalidPath> {
+    struct SegmentInfo {
+        absolute: bool,
+        double_dot_segment_count: u16,
+        index: u16,
+        last_double_dot_segment: Option<u16>,
+        leading_double_dot_segment_count: u16,
+        normalized: bool,
+        single_dot_segment_count: u16,
+        unnormalized_count: u16,
+    }
+
+    impl SegmentInfo {
+        fn into_path<'path>(self, segments: Vec<Segment<'path>>) -> Path<'path> {
+            Path {
+                absolute: self.absolute,
+                double_dot_segment_count: self.double_dot_segment_count,
+                leading_double_dot_segment_count: self.leading_double_dot_segment_count,
+                segments,
+                single_dot_segment_count: self.single_dot_segment_count,
+                unnormalized_count: self.unnormalized_count,
+            }
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn new_segment<'segment>(
         segment: &'segment [u8],
-        index: u16,
-        normalized: bool,
-        unnormalized_count: &mut u16,
-        single_dot_segment_count: &mut u16,
-        double_dot_segment_count: &mut u16,
-        leading_double_dot_segment_count: &mut u16,
-        last_double_dot_segment: &mut Option<u16>,
+        segment_info: &mut SegmentInfo,
     ) -> Segment<'segment> {
-        if !normalized {
-            *unnormalized_count += 1;
+        if !segment_info.normalized {
+            segment_info.unnormalized_count += 1;
         }
 
         if segment == b"." {
-            *single_dot_segment_count += 1;
+            segment_info.single_dot_segment_count += 1;
         }
 
         if segment == b".." {
-            *double_dot_segment_count += 1;
+            let index = segment_info.index;
+            segment_info.double_dot_segment_count += 1;
 
-            if index == 0 || *last_double_dot_segment == Some(index - 1) {
-                *leading_double_dot_segment_count += 1;
-                *last_double_dot_segment = Some(index);
+            if index == 0 || segment_info.last_double_dot_segment == Some(index - 1) {
+                segment_info.leading_double_dot_segment_count += 1;
+                segment_info.last_double_dot_segment = Some(index);
             }
         }
 
         // Unsafe: The loop below makes sure this is safe.
 
         Segment {
-            normalized,
+            normalized: segment_info.normalized,
             segment: Cow::from(unsafe { str::from_utf8_unchecked(segment) }),
         }
     }
@@ -1159,15 +1178,18 @@ pub(crate) fn parse_path(value: &[u8]) -> Result<(Path, &[u8]), InvalidPath> {
     };
 
     let mut bytes = value.iter();
-    let mut double_dot_segment_count = 0;
-    let mut index = 1;
-    let mut last_double_dot_segment = None;
-    let mut leading_double_dot_segment_count = 0;
-    let mut normalized = true;
+    let mut segment_info = SegmentInfo {
+        absolute,
+        double_dot_segment_count: 0,
+        index: 1,
+        last_double_dot_segment: None,
+        leading_double_dot_segment_count: 0,
+        normalized: true,
+        single_dot_segment_count: 0,
+        unnormalized_count: 0,
+    };
     let mut segment_end_index = 0;
     let mut segment_start_index = 0;
-    let mut single_dot_segment_count = 0;
-    let mut unnormalized_count = 0;
 
     // Set some moderate initial capacity. This seems to help with performance a bit.
     let mut segments = Vec::with_capacity(10);
@@ -1177,50 +1199,31 @@ pub(crate) fn parse_path(value: &[u8]) -> Result<(Path, &[u8]), InvalidPath> {
             0 if byte == b'?' || byte == b'#' => {
                 let segment = new_segment(
                     &value[segment_start_index..segment_end_index],
-                    index - 1,
-                    normalized,
-                    &mut unnormalized_count,
-                    &mut single_dot_segment_count,
-                    &mut double_dot_segment_count,
-                    &mut leading_double_dot_segment_count,
-                    &mut last_double_dot_segment,
+                    &mut segment_info,
                 );
                 segments.push(segment);
-                let path = Path {
-                    absolute,
-                    double_dot_segment_count,
-                    leading_double_dot_segment_count,
-                    segments,
-                    single_dot_segment_count,
-                    unnormalized_count,
-                };
-
+                let path = segment_info.into_path(segments);
                 return Ok((path, &value[segment_end_index..]));
             }
             0 if byte == b'/' => {
                 let segment = new_segment(
                     &value[segment_start_index..segment_end_index],
-                    index - 1,
-                    normalized,
-                    &mut unnormalized_count,
-                    &mut single_dot_segment_count,
-                    &mut double_dot_segment_count,
-                    &mut leading_double_dot_segment_count,
-                    &mut last_double_dot_segment,
+                    &mut segment_info,
                 );
                 segments.push(segment);
                 segment_end_index += 1;
                 segment_start_index = segment_end_index;
-                index = index
+                segment_info.index = segment_info
+                    .index
                     .checked_add(1)
                     .ok_or(InvalidPath::ExceededMaximumLength)?;
-                normalized = true;
+                segment_info.normalized = true;
             }
             0 => return Err(InvalidPath::InvalidCharacter),
             b'%' => match get_percent_encoded_value(bytes.next().cloned(), bytes.next().cloned()) {
                 Ok((hex_value, uppercase)) => {
                     if !uppercase || UNRESERVED_CHAR_MAP[hex_value as usize] != 0 {
-                        normalized = false;
+                        segment_info.normalized = false;
                     }
 
                     segment_end_index += 3;
@@ -1231,26 +1234,9 @@ pub(crate) fn parse_path(value: &[u8]) -> Result<(Path, &[u8]), InvalidPath> {
         }
     }
 
-    let segment = new_segment(
-        &value[segment_start_index..],
-        index - 1,
-        normalized,
-        &mut unnormalized_count,
-        &mut single_dot_segment_count,
-        &mut double_dot_segment_count,
-        &mut leading_double_dot_segment_count,
-        &mut last_double_dot_segment,
-    );
+    let segment = new_segment(&value[segment_start_index..], &mut segment_info);
     segments.push(segment);
-
-    let path = Path {
-        absolute,
-        double_dot_segment_count,
-        leading_double_dot_segment_count,
-        segments,
-        single_dot_segment_count,
-        unnormalized_count,
-    };
+    let path = segment_info.into_path(segments);
     Ok((path, b""))
 }
 
