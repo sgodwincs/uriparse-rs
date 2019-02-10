@@ -1154,7 +1154,7 @@ pub(crate) fn parse_path(value: &[u8]) -> Result<(Path, &[u8]), InvalidPath> {
         }
 
         if segment == b".." {
-            let index = segment_info.index;
+            let index = segment_info.index - 1;
             segment_info.double_dot_segment_count += 1;
 
             if index == 0 || segment_info.last_double_dot_segment == Some(index - 1) {
