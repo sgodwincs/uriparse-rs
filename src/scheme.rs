@@ -762,6 +762,7 @@ schemes! {
     (DLNAPlaySingle, "dlna-playsingle", SchemeStatus::Provisional);
     (DNS, "dns", SchemeStatus::Permanent);
     (DNTP, "dntp", SchemeStatus::Provisional);
+    (DPP, "dpp", SchemeStatus::Provisional);
     (DTN, "dtn", SchemeStatus::Provisional);
     (DVB, "dvb", SchemeStatus::Provisional);
     (ED2K, "ed2k", SchemeStatus::Provisional);
