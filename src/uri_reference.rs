@@ -715,6 +715,8 @@ impl<'uri> URIReference<'uri> {
     where
         Mapper: FnOnce(Path<'uri>) -> Path<'uri>,
     {
+        // Unsafe: We're creating an invalid path just as a temporary sentinel value, but it is
+        // replaced shortly after.
         let temp_path = unsafe { Path::new_with_no_segments(true) };
         let path = mapper(mem::replace(&mut self.path, temp_path));
         self.set_path(path)

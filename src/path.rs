@@ -932,7 +932,8 @@ impl Segment<'_> {
     /// ```
     pub fn normalize(&mut self) {
         if !self.normalized {
-            normalize_string(&mut self.segment.to_mut(), true);
+            // Unsafe: Paths must be valid ASCII-US, so this is safe.
+            unsafe { normalize_string(&mut self.segment.to_mut(), true) };
             self.normalized = true;
         }
     }
@@ -1059,6 +1060,7 @@ impl<'segment> TryFrom<&'segment [u8]> for Segment<'segment> {
             }
         }
 
+        // Unsafe: The loop above makes sure the byte string is valid ASCII-US.
         let segment = Segment {
             normalized,
             segment: Cow::Borrowed(unsafe { str::from_utf8_unchecked(value) }),
@@ -1163,8 +1165,7 @@ pub(crate) fn parse_path(value: &[u8]) -> Result<(Path, &[u8]), InvalidPath> {
             }
         }
 
-        // Unsafe: The loop below makes sure this is safe.
-
+        // Unsafe: The loop above makes sure the byte string is valid ASCII-US.
         Segment {
             normalized: segment_info.normalized,
             segment: Cow::from(unsafe { str::from_utf8_unchecked(segment) }),

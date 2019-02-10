@@ -46,8 +46,9 @@ fn hex_digit_to_decimal(digit: u8) -> Result<(u8, bool), ()> {
     }
 }
 
-pub fn normalize_string(string: &mut String, case_sensitive: bool) {
-    let bytes = unsafe { string.as_mut_vec() };
+/// This function is unsafe because it makes the assumption that the given string is valid ASCII-US.
+pub unsafe fn normalize_string(string: &mut String, case_sensitive: bool) {
+    let bytes = string.as_mut_vec();
     let mut read_index = 0;
     let mut write_index = 0;
 

@@ -1054,9 +1054,7 @@ impl<'host> TryFrom<&'host [u8]> for Host<'host> {
                     return Err(InvalidHost::InvalidIPv6Character);
                 }
 
-                // Unsafe: The function above [`check_ipv6`] ensures this is valid ASCII implying
-                // valid UTF-8.
-
+                // Unsafe: The function above [`check_ipv6`] ensures this is valid ASCII-US.
                 let ipv6: Ipv6Addr = unsafe { str::from_utf8_unchecked(ipv6) }
                     .parse()
                     .map_err(|_| InvalidHost::InvalidIPv6Format)?;
@@ -1066,18 +1064,16 @@ impl<'host> TryFrom<&'host [u8]> for Host<'host> {
                 let (valid, normalized) = check_ipv4_or_registered_name(value);
 
                 if valid {
-                    match unsafe { str::from_utf8_unchecked(value) }.parse() {
-                        Ok(ipv4) => Ok(Host::IPv4Address(ipv4)),
-                        Err(_) => {
-                            // Unsafe: The function above [`check_ipv4_or_registered_name`] ensures
-                            // this is valid ASCII implying valid UTF-8.
+                    // Unsafe: The function above [`check_ipv4_or_registered_name`] ensures
+                    // this is valid ASCII-US.
+                    let value_string = unsafe { str::from_utf8_unchecked(value) };
 
-                            let name = unsafe { str::from_utf8_unchecked(value) };
-                            Ok(Host::RegisteredName(RegisteredName {
-                                normalized,
-                                registered_name: Cow::from(name),
-                            }))
-                        }
+                    match value_string.parse() {
+                        Ok(ipv4) => Ok(Host::IPv4Address(ipv4)),
+                        Err(_) => Ok(Host::RegisteredName(RegisteredName {
+                            normalized,
+                            registered_name: Cow::from(value_string),
+                        })),
                     }
                 } else {
                     Err(InvalidHost::InvalidIPv4OrRegisteredNameCharacter)
@@ -1221,7 +1217,8 @@ impl Password<'_> {
     /// ```
     pub fn normalize(&mut self) {
         if !self.normalized {
-            normalize_string(&mut self.password.to_mut(), true);
+            // Unsafe: Passwords must be valid ASCII-US, so this is safe.
+            unsafe { normalize_string(&mut self.password.to_mut(), true) };
             self.normalized = true;
         }
     }
@@ -1329,6 +1326,8 @@ impl<'password> TryFrom<&'password [u8]> for Password<'password> {
 
     fn try_from(value: &'password [u8]) -> Result<Self, Self::Error> {
         let normalized = check_user_info(value, false)?;
+
+        // Unsafe: The function above [`check_user_info`] ensures this is valid ASCII-US.
         Ok(Password {
             normalized,
             password: Cow::from(unsafe { str::from_utf8_unchecked(value) }),
@@ -1472,7 +1471,8 @@ impl RegisteredName<'_> {
     /// ```
     pub fn normalize(&mut self) {
         if !self.normalized {
-            normalize_string(&mut self.registered_name.to_mut(), false);
+            // Unsafe: Registered names must be valid ASCII-US, so this is safe.
+            unsafe { normalize_string(&mut self.registered_name.to_mut(), false) };
             self.normalized = true;
         }
     }
@@ -1713,7 +1713,8 @@ impl Username<'_> {
     /// ```
     pub fn normalize(&mut self) {
         if !self.normalized {
-            normalize_string(&mut self.username.to_mut(), true);
+            // Unsafe: Usernames must be valid ASCII-US, so this is safe.
+            unsafe { normalize_string(&mut self.username.to_mut(), true) };
             self.normalized = true;
         }
     }
@@ -1821,6 +1822,8 @@ impl<'username> TryFrom<&'username [u8]> for Username<'username> {
 
     fn try_from(value: &'username [u8]) -> Result<Self, Self::Error> {
         let normalized = check_user_info(value, true)?;
+
+        // Unsafe: The function above [`check_user_info`] ensure this is valid ASCII-US.
         Ok(Username {
             normalized,
             username: Cow::from(unsafe { str::from_utf8_unchecked(value) }),
@@ -2217,8 +2220,7 @@ fn parse_user_info(value: &[u8]) -> Result<(Username, Option<Password>), Invalid
         }
     }
 
-    // Unsafe: All characters are ASCII, as checked above.
-
+    // Unsafe: All characters are ASCII-US, as checked above.
     Ok(match first_colon_index {
         Some(index) => {
             let username = Username {

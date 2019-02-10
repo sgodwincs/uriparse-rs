@@ -164,7 +164,8 @@ impl Query<'_> {
     /// ```
     pub fn normalize(&mut self) {
         if !self.normalized {
-            normalize_string(&mut self.query.to_mut(), true);
+            // Unsafe: Queries must be valid ASCII-US, so this is safe.
+            unsafe { normalize_string(&mut self.query.to_mut(), true) };
             self.normalized = true;
         }
     }
@@ -347,9 +348,9 @@ pub(crate) fn parse_query(value: &[u8]) -> Result<(Query, &[u8]), InvalidQuery> 
         }
     }
 
-    // Unsafe: The loop above makes sure this is safe.
-
     let (value, rest) = value.split_at(end_index);
+
+    // Unsafe: The loop above makes sure the byte string is valid ASCII-US.
     let query = Query {
         normalized,
         query: Cow::from(unsafe { str::from_utf8_unchecked(value) }),

@@ -176,8 +176,7 @@ macro_rules! schemes {
         /// Parses the scheme from the given byte string.
         pub(crate) fn parse_scheme(value: &[u8]) -> Result<(Scheme, &[u8]), InvalidScheme> {
             fn unregistered_scheme(value: &[u8], normalized: bool) -> Scheme {
-                // Unsafe: The loop below makes sure this is safe.
-
+                // Unsafe: The loop below makes sure the byte string is valid ASCII-US.
                 let scheme = unsafe { str::from_utf8_unchecked(value) };
                 Scheme::Unregistered(UnregisteredScheme{
                     normalized,
@@ -474,7 +473,8 @@ impl UnregisteredScheme<'_> {
     /// ```
     pub fn normalize(&mut self) {
         if !self.normalized {
-            normalize_string(&mut self.scheme.to_mut(), true);
+            // Unsafe: Schemes must be valid ASCII-US, so this is safe.
+            unsafe { normalize_string(&mut self.scheme.to_mut(), true) };
             self.normalized = true;
         }
     }

@@ -160,7 +160,8 @@ impl Fragment<'_> {
     /// ```
     pub fn normalize(&mut self) {
         if !self.normalized {
-            normalize_string(&mut self.fragment.to_mut(), true);
+            // Unsafe: Fragments must be valid ASCII-US, so this is safe.
+            unsafe { normalize_string(&mut self.fragment.to_mut(), true) };
             self.normalized = true;
         }
     }
@@ -287,8 +288,7 @@ impl<'fragment> TryFrom<&'fragment [u8]> for Fragment<'fragment> {
             }
         }
 
-        // Unsafe: The loop above makes sure this is safe.
-
+        // Unsafe: The loop above makes sure the byte string is valid ASCII-US.
         Ok(Fragment {
             fragment: Cow::from(unsafe { str::from_utf8_unchecked(value) }),
             normalized,
