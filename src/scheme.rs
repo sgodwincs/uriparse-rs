@@ -858,6 +858,7 @@ schemes! {
     (MSPowerPoint, "ms-powerpoint", SchemeStatus::Provisional);
     (MSPublisher, "ms-publisher", SchemeStatus::Provisional);
     (MSRestoreTabCompanion, "ms-restoretabcompanion", SchemeStatus::Provisional);
+    (MSS, "mss", SchemeStatus::Provisional);
     (MSScreenClip, "ms-screenclip", SchemeStatus::Provisional);
     (MSScreenSketch, "ms-screensketch", SchemeStatus::Provisional);
     (MSSearch, "ms-search", SchemeStatus::Provisional);
