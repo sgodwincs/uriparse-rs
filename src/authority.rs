@@ -5,8 +5,6 @@
 //! # Examples
 //!
 //! ```
-//! # #![feature(try_from)]
-//! #
 //! use std::convert::TryFrom;
 //!
 //! use uriparse::Authority;
@@ -25,7 +23,7 @@
 //! conversion to [`IpAddr`], which in the case of [`Ipv6Addr`] can be expensive.
 
 use std::borrow::Cow;
-use std::convert::TryFrom;
+use std::convert::{Infallible, TryFrom};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter, Write};
 use std::hash::{Hash, Hasher};
@@ -163,8 +161,6 @@ impl<'authority> Authority<'authority> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Authority;
@@ -226,8 +222,6 @@ impl<'authority> Authority<'authority> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Authority;
@@ -245,8 +239,6 @@ impl<'authority> Authority<'authority> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Authority;
@@ -267,8 +259,6 @@ impl<'authority> Authority<'authority> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Authority;
@@ -289,8 +279,6 @@ impl<'authority> Authority<'authority> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Authority;
@@ -332,8 +320,6 @@ impl<'authority> Authority<'authority> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Authority;
@@ -366,8 +352,6 @@ impl<'authority> Authority<'authority> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Authority;
@@ -401,8 +385,6 @@ impl<'authority> Authority<'authority> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::{Authority, Host};
@@ -429,8 +411,6 @@ impl<'authority> Authority<'authority> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::{Authority, Password};
@@ -453,8 +433,6 @@ impl<'authority> Authority<'authority> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Authority;
@@ -476,8 +454,6 @@ impl<'authority> Authority<'authority> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::{Authority, Username};
@@ -502,8 +478,6 @@ impl<'authority> Authority<'authority> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Authority;
@@ -539,8 +513,6 @@ impl<'authority> Authority<'authority> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Authority;
@@ -560,8 +532,6 @@ impl<'authority> Authority<'authority> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Authority;
@@ -580,8 +550,6 @@ impl<'authority> Authority<'authority> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     /// use std::net::Ipv6Addr;
     ///
@@ -615,8 +583,6 @@ impl<'authority> Authority<'authority> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Authority;
@@ -656,8 +622,6 @@ impl<'authority> Authority<'authority> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Authority;
@@ -680,8 +644,6 @@ impl<'authority> Authority<'authority> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::{Authority, Username};
@@ -722,8 +684,6 @@ impl<'authority> Authority<'authority> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Authority;
@@ -847,8 +807,6 @@ impl Host<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Host;
@@ -868,8 +826,6 @@ impl Host<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Host;
@@ -895,8 +851,6 @@ impl Host<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Host;
@@ -921,8 +875,6 @@ impl Host<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Host;
@@ -950,8 +902,6 @@ impl Host<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Host;
@@ -1134,8 +1084,6 @@ impl Password<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Password;
@@ -1172,8 +1120,6 @@ impl Password<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Password;
@@ -1200,8 +1146,6 @@ impl Password<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Password;
@@ -1385,8 +1329,6 @@ impl RegisteredName<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::RegisteredName;
@@ -1424,8 +1366,6 @@ impl RegisteredName<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::RegisteredName;
@@ -1454,8 +1394,6 @@ impl RegisteredName<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::RegisteredName;
@@ -1630,8 +1568,6 @@ impl Username<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Username;
@@ -1668,8 +1604,6 @@ impl Username<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Username;
@@ -1696,8 +1630,6 @@ impl Username<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Username;
@@ -1871,9 +1803,9 @@ impl Error for InvalidAuthority {
     }
 }
 
-impl From<!> for InvalidAuthority {
-    fn from(value: !) -> Self {
-        value
+impl From<Infallible> for InvalidAuthority {
+    fn from(_: Infallible) -> Self {
+        InvalidAuthority::InvalidHost(InvalidHost::InvalidIPv4OrRegisteredNameCharacter)
     }
 }
 
@@ -1940,9 +1872,9 @@ impl Error for InvalidHost {
     }
 }
 
-impl From<!> for InvalidHost {
-    fn from(value: !) -> Self {
-        value
+impl From<Infallible> for InvalidHost {
+    fn from(_: Infallible) -> Self {
+        InvalidHost::InvalidIPv4OrRegisteredNameCharacter
     }
 }
 
@@ -1974,9 +1906,9 @@ impl Error for InvalidPort {
     }
 }
 
-impl From<!> for InvalidPort {
-    fn from(value: !) -> Self {
-        value
+impl From<Infallible> for InvalidPort {
+    fn from(_: Infallible) -> Self {
+        InvalidPort::InvalidCharacter
     }
 }
 
@@ -2034,9 +1966,9 @@ impl Error for InvalidUserInfo {
     }
 }
 
-impl From<!> for InvalidUserInfo {
-    fn from(value: !) -> Self {
-        value
+impl From<Infallible> for InvalidUserInfo {
+    fn from(_: Infallible) -> Self {
+        InvalidUserInfo::InvalidCharacter
     }
 }
 

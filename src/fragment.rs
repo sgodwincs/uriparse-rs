@@ -3,7 +3,7 @@
 //! See [[RFC3986, Section 3.5](https://tools.ietf.org/html/rfc3986#section-3.5)].
 
 use std::borrow::Cow;
-use std::convert::TryFrom;
+use std::convert::{Infallible, TryFrom};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 use std::hash::{Hash, Hasher};
@@ -77,8 +77,6 @@ impl Fragment<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Fragment;
@@ -115,8 +113,6 @@ impl Fragment<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Fragment;
@@ -143,8 +139,6 @@ impl Fragment<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Fragment;
@@ -332,9 +326,9 @@ impl Error for InvalidFragment {
     }
 }
 
-impl From<!> for InvalidFragment {
-    fn from(value: !) -> Self {
-        value
+impl From<Infallible> for InvalidFragment {
+    fn from(_: Infallible) -> Self {
+        InvalidFragment::InvalidCharacter
     }
 }
 

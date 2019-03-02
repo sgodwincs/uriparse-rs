@@ -7,7 +7,7 @@
 //! [queryst](https://github.com/rustless/queryst)) if you want it parsed.
 
 use std::borrow::Cow;
-use std::convert::TryFrom;
+use std::convert::{Infallible, TryFrom};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 use std::hash::{Hash, Hasher};
@@ -81,8 +81,6 @@ impl Query<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Query;
@@ -119,8 +117,6 @@ impl Query<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Query;
@@ -147,8 +143,6 @@ impl Query<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Query;
@@ -318,9 +312,9 @@ impl Error for InvalidQuery {
     }
 }
 
-impl From<!> for InvalidQuery {
-    fn from(value: !) -> Self {
-        value
+impl From<Infallible> for InvalidQuery {
+    fn from(_: Infallible) -> Self {
+        InvalidQuery::InvalidCharacter
     }
 }
 

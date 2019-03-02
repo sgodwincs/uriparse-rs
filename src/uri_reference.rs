@@ -1,4 +1,4 @@
-use std::convert::TryFrom;
+use std::convert::{Infallible, TryFrom};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter, Write};
 use std::mem;
@@ -42,8 +42,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -81,8 +79,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -106,8 +102,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::{Scheme, URIReference};
@@ -195,8 +189,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -213,8 +205,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -234,8 +224,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -255,8 +243,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -280,8 +266,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -305,8 +289,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -326,8 +308,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -347,8 +327,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -372,8 +350,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -394,8 +370,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::{Fragment, Query, URIReference};
@@ -447,8 +421,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -490,8 +462,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -511,8 +481,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -531,8 +499,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -585,8 +551,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -605,8 +569,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -625,8 +587,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -646,8 +606,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::{Authority, URIReference};
@@ -670,8 +628,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::{Fragment, URIReference};
@@ -697,8 +653,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::{Authority, URIReference};
@@ -728,8 +682,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::{Query, URIReference};
@@ -755,8 +707,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::{Scheme, URIReference};
@@ -781,8 +731,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -821,8 +769,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -841,8 +787,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -863,8 +807,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -885,8 +827,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -903,8 +843,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -925,8 +863,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -963,8 +899,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -1000,8 +934,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -1037,8 +969,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -1072,8 +1002,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -1105,8 +1033,6 @@ impl<'uri> URIReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::URIReference;
@@ -1522,9 +1448,9 @@ impl Error for InvalidURIReference {
     }
 }
 
-impl From<!> for InvalidURIReference {
-    fn from(value: !) -> Self {
-        value
+impl From<Infallible> for InvalidURIReference {
+    fn from(_: Infallible) -> Self {
+        InvalidURIReference::AbsolutePathCannotStartWithTwoSlashes
     }
 }
 

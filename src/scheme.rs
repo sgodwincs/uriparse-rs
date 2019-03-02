@@ -10,7 +10,7 @@ use fnv::FnvBuildHasher;
 use lazy_static::lazy_static;
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::convert::TryFrom;
+use std::convert::{Infallible, TryFrom};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 use std::hash::{Hash, Hasher};
@@ -110,8 +110,6 @@ macro_rules! schemes {
             /// # Examples
             ///
             /// ```
-            /// # #![feature(try_from)]
-            /// #
             /// use std::convert::TryFrom;
             ///
             /// use uriparse::Scheme;
@@ -240,8 +238,6 @@ impl Scheme<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Scheme;
@@ -269,8 +265,6 @@ impl Scheme<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Scheme;
@@ -397,8 +391,6 @@ impl UnregisteredScheme<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::UnregisteredScheme;
@@ -434,8 +426,6 @@ impl UnregisteredScheme<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::UnregisteredScheme;
@@ -457,8 +447,6 @@ impl UnregisteredScheme<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::UnregisteredScheme;
@@ -596,9 +584,9 @@ impl Error for InvalidScheme {
     }
 }
 
-impl From<!> for InvalidScheme {
-    fn from(value: !) -> Self {
-        value
+impl From<Infallible> for InvalidScheme {
+    fn from(_: Infallible) -> Self {
+        InvalidScheme::InvalidCharacter
     }
 }
 
@@ -695,8 +683,6 @@ impl SchemeStatus {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Scheme;

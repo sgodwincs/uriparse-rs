@@ -1,6 +1,4 @@
-#![feature(never_type)]
 #![feature(non_exhaustive)]
-#![feature(try_from)]
 
 mod utility;
 

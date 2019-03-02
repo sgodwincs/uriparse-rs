@@ -3,7 +3,7 @@
 //! See [[RFC3986, Section 3.3](https://tools.ietf.org/html/rfc3986#section-3.3)].
 
 use std::borrow::Cow;
-use std::convert::TryFrom;
+use std::convert::{Infallible, TryFrom};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter, Write};
 use std::hash::{Hash, Hasher};
@@ -82,8 +82,6 @@ impl<'path> Path<'path> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Path;
@@ -130,8 +128,6 @@ impl<'path> Path<'path> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Path;
@@ -155,8 +151,6 @@ impl<'path> Path<'path> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Path;
@@ -197,8 +191,6 @@ impl<'path> Path<'path> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Path;
@@ -321,8 +313,6 @@ impl<'path> Path<'path> {
     /// If the path only contains one segment, then that segment will become empty.
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Path;
@@ -368,8 +358,6 @@ impl<'path> Path<'path> {
     /// itself empty.
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Path;
@@ -435,8 +423,6 @@ impl<'path> Path<'path> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Path;
@@ -523,8 +509,6 @@ impl<'path> Path<'path> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Path;
@@ -544,8 +528,6 @@ impl<'path> Path<'path> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::{Path, Segment};
@@ -565,8 +547,6 @@ impl<'path> Path<'path> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Path;
@@ -763,8 +743,6 @@ impl Segment<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Segment;
@@ -812,8 +790,6 @@ impl Segment<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Segment;
@@ -836,8 +812,6 @@ impl Segment<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Segment;
@@ -863,8 +837,6 @@ impl Segment<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Segment;
@@ -886,8 +858,6 @@ impl Segment<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Segment;
@@ -915,8 +885,6 @@ impl Segment<'_> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::Segment;
@@ -1110,9 +1078,9 @@ impl Error for InvalidPath {
     }
 }
 
-impl From<!> for InvalidPath {
-    fn from(value: !) -> Self {
-        value
+impl From<Infallible> for InvalidPath {
+    fn from(_: Infallible) -> Self {
+        InvalidPath::InvalidCharacter
     }
 }
 

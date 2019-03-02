@@ -1,4 +1,4 @@
-use std::convert::TryFrom;
+use std::convert::{Infallible, TryFrom};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
@@ -30,8 +30,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::RelativeReference;
@@ -71,8 +69,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::{Scheme, RelativeReference};
@@ -120,8 +116,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::RelativeReference;
@@ -138,8 +132,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::RelativeReference;
@@ -159,8 +151,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::RelativeReference;
@@ -180,8 +170,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::RelativeReference;
@@ -201,8 +189,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::RelativeReference;
@@ -222,8 +208,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::RelativeReference;
@@ -243,8 +227,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::RelativeReference;
@@ -264,8 +246,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::RelativeReference;
@@ -282,8 +262,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::{Fragment, Query, RelativeReference};
@@ -326,8 +304,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::RelativeReference;
@@ -362,8 +338,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::RelativeReference;
@@ -383,8 +357,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::RelativeReference;
@@ -403,8 +375,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::RelativeReference;
@@ -429,8 +399,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::RelativeReference;
@@ -450,8 +418,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::{Authority, RelativeReference};
@@ -472,8 +438,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::{Fragment, RelativeReference};
@@ -497,8 +461,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::{Authority, URIReference};
@@ -523,8 +485,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::{Query, RelativeReference};
@@ -547,8 +507,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::RelativeReference;
@@ -571,8 +529,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::RelativeReference;
@@ -591,8 +547,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::RelativeReference;
@@ -609,8 +563,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::RelativeReference;
@@ -627,8 +579,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::RelativeReference;
@@ -649,8 +599,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::RelativeReference;
@@ -679,8 +627,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::RelativeReference;
@@ -714,8 +660,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::RelativeReference;
@@ -744,8 +688,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::RelativeReference;
@@ -772,8 +714,6 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(try_from)]
-    /// #
     /// use std::convert::TryFrom;
     ///
     /// use uriparse::RelativeReference;
@@ -1088,9 +1028,9 @@ impl Error for InvalidRelativeReference {
     }
 }
 
-impl From<!> for InvalidRelativeReference {
-    fn from(value: !) -> Self {
-        value
+impl From<Infallible> for InvalidRelativeReference {
+    fn from(_: Infallible) -> Self {
+        InvalidRelativeReference::CannotBeURI
     }
 }
 
