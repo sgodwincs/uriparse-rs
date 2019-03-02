@@ -1,3 +1,17 @@
+# 0.5.0
+ 
+ - Add new schemes:
+   * mss
+ - Export `InvalidUnregisteredName` from the authority.
+ - Update dependency on `lazy_static` from 1.2.0 to 1.3.0.
+ - Update dev dependecy on `criterion` from 0.2.5 to 0.2.10.
+ - Switch from using `!` to `Infallible` as the latter is being stabilized in 1.34 as a temporary
+   replacement.
+ - Remove required `#![feature(try_from)]` as it is being stabilized in 1.34.
+
+With the above changes, we're very close to having this crate be on stable! The only feature left
+is `non_exhaustive`.
+
 # 0.4.0
 
  - Add new schemes:
