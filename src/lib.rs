@@ -14,8 +14,8 @@ pub mod uri;
 pub mod uri_reference;
 
 pub use self::authority::{
-    Authority, Host, InvalidAuthority, InvalidHost, InvalidPort, InvalidUserInfo, Password,
-    RegisteredName, Username,
+    Authority, Host, InvalidAuthority, InvalidHost, InvalidPort, InvalidRegisteredName,
+    InvalidUserInfo, Password, RegisteredName, Username,
 };
 pub use self::fragment::{Fragment, InvalidFragment};
 pub use self::path::{InvalidPath, Path, Segment};
