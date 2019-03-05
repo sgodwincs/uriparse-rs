@@ -61,11 +61,16 @@ impl<'uri> URI<'uri> {
     /// # Examples
     ///
     /// ```
-    /// use uriparse::URI;
+    /// use std::convert::TryFrom;
     ///
-    /// let mut builder = URI::builder();
-    /// builder.scheme("http").authority(Some("example.com")).path("/my/path");
-    /// let uri = builder.build().unwrap();
+    /// use uriparse::{Authority, Path, Scheme, URI};
+    ///
+    /// let uri = URI::builder()
+    ///     .with_scheme(Scheme::HTTP)
+    ///     .with_authority(Some(Authority::try_from("example.com").unwrap()))
+    ///     .with_path(Path::try_from("/my/path").unwrap())
+    ///     .build()
+    ///     .unwrap();
     /// assert_eq!(uri.to_string(), "http://example.com/my/path");
     /// ```
     pub fn builder<'new_uri>() -> URIBuilder<'new_uri> {
@@ -945,30 +950,24 @@ pub struct URIBuilder<'uri> {
 impl<'uri> URIBuilder<'uri> {
     /// Sets the authority part of the URI.
     ///
-    /// If the given authority is not a valid authority (i.e. the conversion fails), an error is
-    /// stored internally and checked during the [`URIBuilder::build`] function. The error state
-    /// will be rewritten for any following calls to this function.
-    ///
-    /// It is optional to specify an authority.
+    /// It is optional to specify a authority.
     ///
     /// # Examples
     ///
     /// ```
-    /// use uriparse::URIBuilder;
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Authority, Path, Scheme, URIBuilder};
     ///
     /// let mut builder = URIBuilder::new();
-    /// builder.scheme("http").authority(Some("example.com")).path("/my/path");
-    /// let uri = builder.build().unwrap();
-    /// assert_eq!(uri.to_string(), "http://example.com/my/path");
+    /// builder
+    ///     .scheme(Scheme::HTTP)
+    ///     .authority(Some(Authority::try_from("example.com").unwrap()))
+    ///     .path(Path::try_from("/my/path").unwrap());
+    /// let reference = builder.build().unwrap();
+    /// assert_eq!(reference.to_string(), "http://example.com/my/path");
     /// ```
-    pub fn authority<AuthorityType, AuthorityError>(
-        &mut self,
-        authority: Option<AuthorityType>,
-    ) -> &mut Self
-    where
-        Authority<'uri>: TryFrom<AuthorityType, Error = AuthorityError>,
-        InvalidAuthority: From<AuthorityError>,
-    {
+    pub fn authority(&mut self, authority: Option<Authority<'uri>>) -> &mut Self {
         self.uri_reference_builder.authority(authority);
         self
     }
@@ -976,40 +975,37 @@ impl<'uri> URIBuilder<'uri> {
     /// Consumes the builder and tries to build a [`URI`].
     ///
     /// This function will error in one of three situations:
-    ///  - One of the components specified in the builder is invalid.
     ///  - A scheme and path were not specified in the builder.
     ///  - While all individual components were valid, their combination as a URI was invalid.
     ///
     /// # Examples
     ///
-    /// First error type (invalid path):
+    /// First error type (scheme and/or path were not specified):
     ///
     /// ```
-    /// use uriparse::URIBuilder;
+    /// use std::convert::TryFrom;
     ///
-    /// let mut builder = URIBuilder::new();
-    /// builder.scheme("urn").path("this is an invalid path %%%");
-    /// assert!(builder.build().is_err());
+    /// use uriparse::{Authority, Path, URIBuilder};
+    ///
+    /// let result = URIBuilder::new()
+    ///     .with_authority(Some(Authority::try_from("example.com").unwrap()))
+    ///     .with_path(Path::try_from("/my/path").unwrap())
+    ///     .build();
+    /// assert!(result.is_err());
     /// ```
     ///
-    /// Second error type (scheme and/or path were not specified):
+    /// Second error type (URI with no authority cannot have path starting with `"//"`):
     ///
     /// ```
-    /// use uriparse::URIBuilder;
+    /// use std::convert::TryFrom;
     ///
-    /// let mut builder = URIBuilder::new();
-    /// builder.path("/my/path");
-    /// assert!(builder.build().is_err());
-    /// ```
+    /// use uriparse::{Scheme, Path, URIBuilder};
     ///
-    /// Third error type (URI with no authority cannot have path starting with `"//"`):
-    ///
-    /// ```
-    /// use uriparse::URIBuilder;
-    ///
-    /// let mut builder = URIBuilder::new();
-    /// builder.scheme("urn").path("//path");
-    /// assert!(builder.build().is_err());
+    /// let result = URIBuilder::new()
+    ///     .with_scheme(Scheme::URN)
+    ///     .with_path(Path::try_from("//path").unwrap())
+    ///     .build();
+    /// assert!(result.is_err());
     /// ```
     pub fn build(self) -> Result<URI<'uri>, InvalidURI> {
         let uri_reference = self
@@ -1026,6 +1022,144 @@ impl<'uri> URIBuilder<'uri> {
 
     /// Sets the fragment part of the URI.
     ///
+    /// It is optional to specify a fragment.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Fragment, Path, Scheme, URIBuilder};
+    ///
+    /// let mut builder = URIBuilder::new();
+    /// builder
+    ///     .scheme(Scheme::URN)
+    ///     .path(Path::try_from("path").unwrap())
+    ///     .fragment(Some(Fragment::try_from("fragment").unwrap()));
+    /// let uri = builder.build().unwrap();
+    /// assert_eq!(uri.to_string(), "urn:path#fragment");
+    /// ```
+    pub fn fragment(&mut self, fragment: Option<Fragment<'uri>>) -> &mut Self {
+        self.uri_reference_builder.fragment(fragment);
+        self
+    }
+
+    /// Constructs a new builder with nothing set.
+    pub fn new() -> Self {
+        URIBuilder::default()
+    }
+
+    /// Sets the path part of the URI.
+    ///
+    /// It is required to specify a path. Not doing so will result in an error during the
+    /// [`URIBuilder::build`] function.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Path, Scheme, URIBuilder};
+    ///
+    /// let mut builder = URIBuilder::new();
+    /// builder
+    ///     .scheme(Scheme::URN)
+    ///     .path(Path::try_from("path").unwrap());
+    /// let uri = builder.build().unwrap();
+    /// assert_eq!(uri.to_string(), "urn:path");
+    /// ```
+    pub fn path(&mut self, path: Path<'uri>) -> &mut Self {
+        self.uri_reference_builder.path(path);
+        self
+    }
+
+    /// Sets the query part of the URI reference.
+    ///
+    /// It is optional to specify a query.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Path, Query, Scheme, URIBuilder};
+    ///
+    /// let mut builder = URIBuilder::new();
+    /// builder
+    ///     .scheme(Scheme::URN)
+    ///     .path(Path::try_from("path").unwrap())
+    ///     .query(Some(Query::try_from("query").unwrap()));
+    /// let uri = builder.build().unwrap();
+    /// assert_eq!(uri.to_string(), "urn:path?query");
+    /// ```
+    pub fn query(&mut self, query: Option<Query<'uri>>) -> &mut Self {
+        self.uri_reference_builder.query(query);
+        self
+    }
+
+    /// Sets the scheme part of the URI reference.
+    ///
+    /// It is required to specify a scheme. Not doing so will result in an error during the
+    /// [`URIBuilder::build`] function.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Authority, Path, Scheme, URIBuilder};
+    ///
+    /// let mut builder = URIBuilder::new();
+    /// builder
+    ///     .scheme(Scheme::HTTP)
+    ///     .authority(Some(Authority::try_from("example.com").unwrap()))
+    ///     .path(Path::try_from("/my/path").unwrap());
+    /// let uri = builder.build().unwrap();
+    /// assert_eq!(uri.to_string(), "http://example.com/my/path");
+    /// ```
+    pub fn scheme(&mut self, scheme: Scheme<'uri>) -> &mut Self {
+        self.uri_reference_builder.scheme(Some(scheme));
+        self
+    }
+
+    /// Sets the authority part of the URI.1
+    ///
+    /// If the given authority is not a valid authority (i.e. the conversion fails), an error is
+    /// stored internally and checked during the [`URIBuilder::build`] function. The error state
+    /// will be rewritten for any following calls to this function.
+    ///
+    /// It is optional to specify an authority.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use uriparse::URIBuilder;
+    ///
+    /// let mut builder = URIBuilder::new();
+    /// builder
+    ///     .try_scheme("http")
+    ///     .unwrap()
+    ///     .try_authority(Some("example.com"))
+    ///     .unwrap()
+    ///     .try_path("/my/path")
+    ///     .unwrap();
+    /// let uri = builder.build().unwrap();
+    /// assert_eq!(uri.to_string(), "http://example.com/my/path");
+    /// ```
+    pub fn try_authority<AuthorityType, AuthorityError>(
+        &mut self,
+        authority: Option<AuthorityType>,
+    ) -> Result<&mut Self, InvalidAuthority>
+    where
+        Authority<'uri>: TryFrom<AuthorityType, Error = AuthorityError>,
+        InvalidAuthority: From<AuthorityError>,
+    {
+        self.uri_reference_builder.try_authority(authority)?;
+        Ok(self)
+    }
+
+    /// Sets the fragment part of the URI.
+    ///
     /// If the given fragment is not a valid fragment (i.e. the conversion fails), an error is
     /// stored internally and checked during the [`URIBuilder::build`] function. The error state
     /// will be rewritten for any following calls to this function.
@@ -1038,25 +1172,26 @@ impl<'uri> URIBuilder<'uri> {
     /// use uriparse::URIBuilder;
     ///
     /// let mut builder = URIBuilder::new();
-    /// builder.scheme("urn").path("path").fragment(Some("fragment"));
+    /// builder
+    ///     .try_scheme("urn")
+    ///     .unwrap()
+    ///     .try_path("path")
+    ///     .unwrap()
+    ///     .try_fragment(Some("fragment"))
+    ///     .unwrap();
     /// let uri = builder.build().unwrap();
     /// assert_eq!(uri.to_string(), "urn:path#fragment");
     /// ```
-    pub fn fragment<FragmentType, FragmentError>(
+    pub fn try_fragment<FragmentType, FragmentError>(
         &mut self,
         fragment: Option<FragmentType>,
-    ) -> &mut Self
+    ) -> Result<&mut Self, InvalidFragment>
     where
         Fragment<'uri>: TryFrom<FragmentType, Error = FragmentError>,
         InvalidFragment: From<FragmentError>,
     {
-        self.uri_reference_builder.fragment(fragment);
-        self
-    }
-
-    /// Constructs a new builder with nothing set.
-    pub fn new() -> Self {
-        URIBuilder::default()
+        self.uri_reference_builder.try_fragment(fragment)?;
+        Ok(self)
     }
 
     /// Sets the path part of the URI.
@@ -1073,17 +1208,24 @@ impl<'uri> URIBuilder<'uri> {
     /// use uriparse::URIBuilder;
     ///
     /// let mut builder = URIBuilder::new();
-    /// builder.scheme("urn").path("path");
+    /// builder
+    ///     .try_scheme("urn")
+    ///     .unwrap()
+    ///     .try_path("path")
+    ///     .unwrap();
     /// let uri = builder.build().unwrap();
     /// assert_eq!(uri.to_string(), "urn:path");
     /// ```
-    pub fn path<PathType, PathError>(&mut self, path: PathType) -> &mut Self
+    pub fn try_path<PathType, PathError>(
+        &mut self,
+        path: PathType,
+    ) -> Result<&mut Self, InvalidPath>
     where
         Path<'uri>: TryFrom<PathType, Error = PathError>,
         InvalidPath: From<PathError>,
     {
-        self.uri_reference_builder.path(path);
-        self
+        self.uri_reference_builder.try_path(path)?;
+        Ok(self)
     }
 
     /// Sets the query part of the URI.
@@ -1100,17 +1242,26 @@ impl<'uri> URIBuilder<'uri> {
     /// use uriparse::URIBuilder;
     ///
     /// let mut builder = URIBuilder::new();
-    /// builder.scheme("urn").path("path").query(Some("query"));
+    /// builder
+    ///     .try_scheme("urn")
+    ///     .unwrap()
+    ///     .try_path("path")
+    ///     .unwrap()
+    ///     .try_query(Some("query"))
+    ///     .unwrap();
     /// let uri = builder.build().unwrap();
     /// assert_eq!(uri.to_string(), "urn:path?query");
     /// ```
-    pub fn query<QueryType, QueryError>(&mut self, query: Option<QueryType>) -> &mut Self
+    pub fn try_query<QueryType, QueryError>(
+        &mut self,
+        query: Option<QueryType>,
+    ) -> Result<&mut Self, InvalidQuery>
     where
         Query<'uri>: TryFrom<QueryType, Error = QueryError>,
         InvalidQuery: From<QueryError>,
     {
-        self.uri_reference_builder.query(query);
-        self
+        self.uri_reference_builder.try_query(query)?;
+        Ok(self)
     }
 
     /// Sets the scheme part of the URI.
@@ -1119,24 +1270,156 @@ impl<'uri> URIBuilder<'uri> {
     /// internally and checked during the [`URIBuilder::build`] function. The error state will be
     /// rewritten for any following calls to this function.
     ///
-    /// It is required to specify a scheme.
+    /// It is required to specify a scheme. Not doing so will result in an error during the
+    /// [`URIBuilder::build`] function.
     ///
     /// # Examples
     ///
     /// ```
-    /// use uriparse::URIBuilder;
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Path, Scheme, URIBuilder};
     ///
     /// let mut builder = URIBuilder::new();
-    /// builder.scheme("urn").path("path");
+    /// builder
+    ///     .try_scheme("urn")
+    ///     .unwrap()
+    ///     .try_path("path")
+    ///     .unwrap();
     /// let uri = builder.build().unwrap();
     /// assert_eq!(uri.to_string(), "urn:path");
     /// ```
-    pub fn scheme<SchemeType, SchemeError>(&mut self, scheme: SchemeType) -> &mut Self
+    pub fn try_scheme<SchemeType, SchemeError>(
+        &mut self,
+        scheme: SchemeType,
+    ) -> Result<&mut Self, InvalidScheme>
     where
         Scheme<'uri>: TryFrom<SchemeType, Error = SchemeError>,
         InvalidScheme: From<SchemeError>,
     {
-        self.uri_reference_builder.scheme(Some(scheme));
+        self.uri_reference_builder.try_scheme(Some(scheme))?;
+        Ok(self)
+    }
+
+    /// Consumes the builder and sets the authority part of the URI.
+    ///
+    /// It is optional to specify an authority.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Authority, Path, Scheme, URIBuilder};
+    ///
+    /// let uri = URIBuilder::new()
+    ///     .with_scheme(Scheme::HTTP)
+    ///     .with_authority(Some(Authority::try_from("example.com").unwrap()))
+    ///     .with_path(Path::try_from("/").unwrap())
+    ///     .build()
+    ///     .unwrap();
+    /// assert_eq!(uri.to_string(), "http://example.com/")
+    /// ```
+    pub fn with_authority(mut self, authority: Option<Authority<'uri>>) -> Self {
+        self.authority(authority);
+        self
+    }
+
+    /// Consumes the builder and sets the fragment part of the URI.
+    ///
+    /// It is optional to specify a fragment.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Fragment, Path, Scheme, URIBuilder};
+    ///
+    /// let uri = URIBuilder::new()
+    ///     .with_scheme(Scheme::URN)
+    ///     .with_path(Path::try_from("").unwrap())
+    ///     .with_fragment(Some(Fragment::try_from("fragment").unwrap()))
+    ///     .build()
+    ///     .unwrap();
+    /// assert_eq!(uri.to_string(), "urn:#fragment")
+    /// ```
+    pub fn with_fragment(mut self, fragment: Option<Fragment<'uri>>) -> Self {
+        self.fragment(fragment);
+        self
+    }
+
+    /// Consumes the builder and sets the path part of the URI.
+    ///
+    /// It is required to specify a path. Not doing so will result in an error during the
+    /// [`URIBuilder::build`] function.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Authority, Path, Scheme, URIBuilder};
+    ///
+    /// let reference = URIBuilder::new()
+    ///     .with_scheme(Scheme::HTTP)
+    ///     .with_authority(Some(Authority::try_from("example.com").unwrap()))
+    ///     .with_path(Path::try_from("/").unwrap())
+    ///     .build()
+    ///     .unwrap();
+    /// assert_eq!(reference.to_string(), "http://example.com/")
+    /// ```
+    pub fn with_path(mut self, path: Path<'uri>) -> Self {
+        self.path(path);
+        self
+    }
+
+    /// Consumes the builder and sets the query part of the URI.
+    ///
+    /// It is optional to specify a query.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Path, Query, Scheme, URIBuilder};
+    ///
+    /// let uri = URIBuilder::new()
+    ///     .with_scheme(Scheme::URN)
+    ///     .with_path(Path::try_from("").unwrap())
+    ///     .with_query(Some(Query::try_from("query").unwrap()))
+    ///     .build()
+    ///     .unwrap();
+    /// assert_eq!(uri.to_string(), "urn:?query")
+    /// ```
+    pub fn with_query(mut self, query: Option<Query<'uri>>) -> Self {
+        self.query(query);
+        self
+    }
+
+    /// Consumes the builder and sets the scheme part of the URI.
+    ///
+    /// It is required to specify a scheme. Not doing so will result in an error during the
+    /// [`URIBuilder::build`] function.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Authority, Path, Scheme, URIBuilder};
+    ///
+    /// let reference = URIBuilder::new()
+    ///     .with_scheme(Scheme::HTTP)
+    ///     .with_authority(Some(Authority::try_from("example.com").unwrap()))
+    ///     .with_path(Path::try_from("/").unwrap())
+    ///     .build()
+    ///     .unwrap();
+    /// assert_eq!(reference.to_string(), "http://example.com/")
+    /// ```
+    pub fn with_scheme(mut self, scheme: Scheme<'uri>) -> Self {
+        self.scheme(scheme);
         self
     }
 }

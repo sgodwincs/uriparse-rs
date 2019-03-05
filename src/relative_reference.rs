@@ -49,11 +49,15 @@ impl<'uri> RelativeReference<'uri> {
     /// # Examples
     ///
     /// ```
-    /// use uriparse::RelativeReference;
+    /// use std::convert::TryFrom;
     ///
-    /// let mut builder = RelativeReference::builder();
-    /// builder.path("/my/path").fragment(Some("fragment"));
-    /// let reference = builder.build().unwrap();
+    /// use uriparse::{Fragment, Path, RelativeReference};
+    ///
+    /// let reference = RelativeReference::builder()
+    ///     .with_path(Path::try_from("/my/path").unwrap())
+    ///     .with_fragment(Some(Fragment::try_from("fragment").unwrap()))
+    ///     .build()
+    ///     .unwrap();
     /// assert_eq!(reference.to_string(), "/my/path#fragment");
     /// ```
     pub fn builder<'new_uri>() -> RelativeReferenceBuilder<'new_uri> {
@@ -795,6 +799,142 @@ pub struct RelativeReferenceBuilder<'uri> {
 impl<'uri> RelativeReferenceBuilder<'uri> {
     /// Sets the authority part of the relative reference.
     ///
+    /// It is optional to specify a authority.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Authority, Path, RelativeReferenceBuilder};
+    ///
+    /// let mut builder = RelativeReferenceBuilder::new();
+    /// builder
+    ///     .authority(Some(Authority::try_from("example.com").unwrap()))
+    ///     .path(Path::try_from("/my/path").unwrap());
+    /// let reference = builder.build().unwrap();
+    /// assert_eq!(reference.to_string(), "//example.com/my/path");
+    /// ```
+    pub fn authority(&mut self, authority: Option<Authority<'uri>>) -> &mut Self {
+        self.uri_reference_builder.authority(authority);
+        self
+    }
+
+    /// Consumes the builder and tries to build a [`RelativeReference`].
+    ///
+    /// This function will error in one of two situations:
+    ///  - A path was not specified in the builder.
+    ///  - While all individual components were valid, their combination as a relative reference was
+    ///    invalid.
+    ///
+    /// # Examples
+    ///
+    /// First error type (path not specified):
+    ///
+    /// ```
+    /// use uriparse::RelativeReferenceBuilder;
+    ///
+    /// let result = RelativeReferenceBuilder::new().build();
+    /// assert!(result.is_err());
+    /// ```
+    ///
+    /// Second error type (first segment in schemeless path cannot contain a `':'`):
+    ///
+    /// ```
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Path, RelativeReferenceBuilder};
+    ///
+    /// let result = RelativeReferenceBuilder::new()
+    ///     .with_path(Path::try_from("my:/path").unwrap())
+    ///     .build();
+    /// assert!(result.is_err());
+    /// ```
+    pub fn build(self) -> Result<RelativeReference<'uri>, InvalidRelativeReference> {
+        Ok(RelativeReference {
+            uri_reference: self
+                .uri_reference_builder
+                .build()
+                .map_err(|error| InvalidRelativeReference::try_from(error).unwrap())?,
+        })
+    }
+
+    /// Sets the fragment part of the relative reference.
+    ///
+    /// It is optional to specify a fragment.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Fragment, Path, RelativeReferenceBuilder};
+    ///
+    /// let mut builder = RelativeReferenceBuilder::new();
+    /// builder
+    ///     .path(Path::try_from("/my/path").unwrap())
+    ///     .fragment(Some(Fragment::try_from("fragment").unwrap()));
+    /// let reference = builder.build().unwrap();
+    /// assert_eq!(reference.to_string(), "/my/path#fragment");
+    /// ```
+    pub fn fragment(&mut self, fragment: Option<Fragment<'uri>>) -> &mut Self {
+        self.uri_reference_builder.fragment(fragment);
+        self
+    }
+
+    /// Constructs a new builder with nothing set.
+    pub fn new() -> Self {
+        RelativeReferenceBuilder::default()
+    }
+
+    /// Sets the path part of the relative reference.
+    ///
+    /// It is required to specify a path. Not doing so will result in an error during the
+    /// [`RelativeReferenceBuilder::build`] function.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Path, RelativeReferenceBuilder};
+    ///
+    /// let mut builder = RelativeReferenceBuilder::new();
+    /// builder
+    ///     .path(Path::try_from("/my/path").unwrap());
+    /// let reference = builder.build().unwrap();
+    /// assert_eq!(reference.to_string(), "/my/path");
+    /// ```
+    pub fn path(&mut self, path: Path<'uri>) -> &mut Self {
+        self.uri_reference_builder.path(path);
+        self
+    }
+
+    /// Sets the query part of the relative reference.
+    ///
+    /// It is optional to specify a query.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Path, Query, RelativeReferenceBuilder};
+    ///
+    /// let mut builder = RelativeReferenceBuilder::new();
+    /// builder
+    ///     .path(Path::try_from("/my/path").unwrap())
+    ///     .query(Some(Query::try_from("query").unwrap()));
+    /// let reference = builder.build().unwrap();
+    /// assert_eq!(reference.to_string(), "/my/path?query");
+    /// ```
+    pub fn query(&mut self, query: Option<Query<'uri>>) -> &mut Self {
+        self.uri_reference_builder.query(query);
+        self
+    }
+
+    /// Sets the authority part of the relative reference.
+    ///
     /// If the given authority is not a valid authority (i.e. the conversion fails), an error is
     /// stored internally and checked during the [`RelativeReferenceBuilder::build`] function. The
     /// error state will be rewritten for any following calls to this function.
@@ -807,67 +947,24 @@ impl<'uri> RelativeReferenceBuilder<'uri> {
     /// use uriparse::RelativeReferenceBuilder;
     ///
     /// let mut builder = RelativeReferenceBuilder::new();
-    /// builder.authority(Some("example.com")).path("/my/path");
+    /// builder
+    ///     .try_authority(Some("example.com"))
+    ///     .unwrap()    
+    ///     .try_path("/my/path")
+    ///     .unwrap();
     /// let reference = builder.build().unwrap();
     /// assert_eq!(reference.to_string(), "//example.com/my/path");
     /// ```
-    pub fn authority<AuthorityType, AuthorityError>(
+    pub fn try_authority<AuthorityType, AuthorityError>(
         &mut self,
         authority: Option<AuthorityType>,
-    ) -> &mut Self
+    ) -> Result<&mut Self, InvalidAuthority>
     where
         Authority<'uri>: TryFrom<AuthorityType, Error = AuthorityError>,
         InvalidAuthority: From<AuthorityError>,
     {
-        self.uri_reference_builder.authority(authority);
-        self
-    }
-
-    /// Consumes the builder and tries to build a [`RelativeReference`].
-    ///
-    /// This function will error in one of three situations:
-    ///  - One of the components specified in the builder is invalid.
-    ///  - A path was not specified in the builder.
-    ///  - While all individual components were valid, their combination as a relative reference was
-    ///    invalid.
-    ///
-    /// # Examples
-    ///
-    /// First error type (invalid path):
-    ///
-    /// ```
-    /// use uriparse::RelativeReferenceBuilder;
-    ///
-    /// let mut builder = RelativeReferenceBuilder::new();
-    /// builder.path("this is an invalid path %%%");
-    /// assert!(builder.build().is_err());
-    /// ```
-    ///
-    /// Second error type (path not specified):
-    ///
-    /// ```
-    /// use uriparse::RelativeReferenceBuilder;
-    ///
-    /// let builder = RelativeReferenceBuilder::new();
-    /// assert!(builder.build().is_err());
-    /// ```
-    ///
-    /// Third error type (first segment in schemeless path cannot contain a `':'`):
-    ///
-    /// ```
-    /// use uriparse::RelativeReferenceBuilder;
-    ///
-    /// let mut builder = RelativeReferenceBuilder::new();
-    /// builder.path("my:/path");
-    /// assert!(builder.build().is_err());
-    /// ```
-    pub fn build(self) -> Result<RelativeReference<'uri>, InvalidRelativeReference> {
-        Ok(RelativeReference {
-            uri_reference: self
-                .uri_reference_builder
-                .build()
-                .map_err(|error| InvalidRelativeReference::try_from(error).unwrap())?,
-        })
+        self.uri_reference_builder.try_authority(authority)?;
+        Ok(self)
     }
 
     /// Sets the fragment part of the relative reference.
@@ -884,25 +981,24 @@ impl<'uri> RelativeReferenceBuilder<'uri> {
     /// use uriparse::RelativeReferenceBuilder;
     ///
     /// let mut builder = RelativeReferenceBuilder::new();
-    /// builder.path("/my/path").fragment(Some("fragment"));
+    /// builder
+    ///     .try_path("/my/path")
+    ///     .unwrap()
+    ///     .try_fragment(Some("fragment"))
+    ///     .unwrap();
     /// let reference = builder.build().unwrap();
     /// assert_eq!(reference.to_string(), "/my/path#fragment");
     /// ```
-    pub fn fragment<FragmentType, FragmentError>(
+    pub fn try_fragment<FragmentType, FragmentError>(
         &mut self,
         fragment: Option<FragmentType>,
-    ) -> &mut Self
+    ) -> Result<&mut Self, InvalidFragment>
     where
         Fragment<'uri>: TryFrom<FragmentType, Error = FragmentError>,
         InvalidFragment: From<FragmentError>,
     {
-        self.uri_reference_builder.fragment(fragment);
-        self
-    }
-
-    /// Constructs a new builder with nothing set.
-    pub fn new() -> Self {
-        RelativeReferenceBuilder::default()
+        self.uri_reference_builder.try_fragment(fragment)?;
+        Ok(self)
     }
 
     /// Sets the path part of the relative reference.
@@ -920,17 +1016,22 @@ impl<'uri> RelativeReferenceBuilder<'uri> {
     /// use uriparse::RelativeReferenceBuilder;
     ///
     /// let mut builder = RelativeReferenceBuilder::new();
-    /// builder.path("/my/path");
+    /// builder
+    ///     .try_path("/my/path")
+    ///     .unwrap();
     /// let reference = builder.build().unwrap();
     /// assert_eq!(reference.to_string(), "/my/path");
     /// ```
-    pub fn path<PathType, PathError>(&mut self, path: PathType) -> &mut Self
+    pub fn try_path<PathType, PathError>(
+        &mut self,
+        path: PathType,
+    ) -> Result<&mut Self, InvalidPath>
     where
         Path<'uri>: TryFrom<PathType, Error = PathError>,
         InvalidPath: From<PathError>,
     {
-        self.uri_reference_builder.path(path);
-        self
+        self.uri_reference_builder.try_path(path)?;
+        Ok(self)
     }
 
     /// Sets the query part of the relative reference.
@@ -947,16 +1048,115 @@ impl<'uri> RelativeReferenceBuilder<'uri> {
     /// use uriparse::RelativeReferenceBuilder;
     ///
     /// let mut builder = RelativeReferenceBuilder::new();
-    /// builder.path("/my/path").query(Some("query"));
+    /// builder
+    ///     .try_path("/my/path")
+    ///     .unwrap()
+    ///     .try_query(Some("query"))
+    ///     .unwrap();
     /// let reference = builder.build().unwrap();
     /// assert_eq!(reference.to_string(), "/my/path?query");
     /// ```
-    pub fn query<QueryType, QueryError>(&mut self, query: Option<QueryType>) -> &mut Self
+    pub fn try_query<QueryType, QueryError>(
+        &mut self,
+        query: Option<QueryType>,
+    ) -> Result<&mut Self, InvalidQuery>
     where
         Query<'uri>: TryFrom<QueryType, Error = QueryError>,
         InvalidQuery: From<QueryError>,
     {
-        self.uri_reference_builder.query(query);
+        self.uri_reference_builder.try_query(query)?;
+        Ok(self)
+    }
+
+    /// Consumes the builder and sets the authority part of the relative reference.
+    ///
+    /// It is optional to specify an authority.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Authority, Path, RelativeReferenceBuilder};
+    ///
+    /// let reference = RelativeReferenceBuilder::new()
+    ///     .with_authority(Some(Authority::try_from("example.com").unwrap()))
+    ///     .with_path(Path::try_from("/").unwrap())
+    ///     .build()
+    ///     .unwrap();
+    /// assert_eq!(reference.to_string(), "//example.com/")
+    /// ```
+    pub fn with_authority(mut self, authority: Option<Authority<'uri>>) -> Self {
+        self.authority(authority);
+        self
+    }
+
+    /// Consumes the builder and sets the fragment part of the relative reference.
+    ///
+    /// It is optional to specify a fragment.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Fragment, Path, RelativeReferenceBuilder};
+    ///
+    /// let reference = RelativeReferenceBuilder::new()
+    ///     .with_path(Path::try_from("/").unwrap())
+    ///     .with_fragment(Some(Fragment::try_from("fragment").unwrap()))
+    ///     .build()
+    ///     .unwrap();
+    /// assert_eq!(reference.to_string(), "/#fragment")
+    /// ```
+    pub fn with_fragment(mut self, fragment: Option<Fragment<'uri>>) -> Self {
+        self.fragment(fragment);
+        self
+    }
+
+    /// Consumes the builder and sets the path part of the relative reference.
+    ///
+    /// It is required to specify a path. Not doing so will result in an error during the
+    /// [`RelativeReferenceBuilder::build`] function.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Path, RelativeReferenceBuilder};
+    ///
+    /// let reference = RelativeReferenceBuilder::new()
+    ///     .with_path(Path::try_from("/").unwrap())
+    ///     .build()
+    ///     .unwrap();
+    /// assert_eq!(reference.to_string(), "/")
+    /// ```
+    pub fn with_path(mut self, path: Path<'uri>) -> Self {
+        self.path(path);
+        self
+    }
+
+    /// Consumes the builder and sets the query part of the relative reference.
+    ///
+    /// It is optional to specify a query.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::convert::TryFrom;
+    ///
+    /// use uriparse::{Path, Query, RelativeReferenceBuilder};
+    ///
+    /// let reference = RelativeReferenceBuilder::new()
+    ///     .with_path(Path::try_from("/").unwrap())
+    ///     .with_query(Some(Query::try_from("query").unwrap()))
+    ///     .build()
+    ///     .unwrap();
+    /// assert_eq!(reference.to_string(), "/?query")
+    /// ```
+    pub fn with_query(mut self, query: Option<Query<'uri>>) -> Self {
+        self.query(query);
         self
     }
 }
