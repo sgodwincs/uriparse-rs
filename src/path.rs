@@ -374,16 +374,13 @@ impl<'path> Path<'path> {
     /// path.push("");
     /// assert_eq!(path, "//");
     /// ```
-    pub fn push<SegmentType, SegmentError>(
-        &mut self,
-        segment: SegmentType,
-    ) -> Result<(), InvalidPath>
+    pub fn push<TSegment, TSegmentError>(&mut self, segment: TSegment) -> Result<(), PathError>
     where
-        Segment<'path>: TryFrom<SegmentType, Error = SegmentError>,
-        InvalidPath: From<SegmentError>,
+        Segment<'path>: TryFrom<TSegment, Error = TSegmentError>,
+        PathError: From<TSegmentError>,
     {
         if self.segments.len() as u16 == u16::max_value() {
-            return Err(InvalidPath::ExceededMaximumLength);
+            return Err(PathError::ExceededMaximumLength);
         }
 
         let segment = Segment::try_from(segment)?;
@@ -689,7 +686,7 @@ impl<'a, 'path> PartialEq<Path<'path>> for &'a str {
 }
 
 impl<'path> TryFrom<&'path [u8]> for Path<'path> {
-    type Error = InvalidPath;
+    type Error = PathError;
 
     fn try_from(value: &'path [u8]) -> Result<Self, Self::Error> {
         let (path, rest) = parse_path(value)?;
@@ -697,13 +694,13 @@ impl<'path> TryFrom<&'path [u8]> for Path<'path> {
         if rest.is_empty() {
             Ok(path)
         } else {
-            Err(InvalidPath::InvalidCharacter)
+            Err(PathError::InvalidCharacter)
         }
     }
 }
 
 impl<'path> TryFrom<&'path str> for Path<'path> {
-    type Error = InvalidPath;
+    type Error = PathError;
 
     fn try_from(value: &'path str) -> Result<Self, Self::Error> {
         Path::try_from(value.as_bytes())
@@ -1005,7 +1002,7 @@ impl<'a, 'segment> PartialEq<Segment<'segment>> for &'a str {
 }
 
 impl<'segment> TryFrom<&'segment [u8]> for Segment<'segment> {
-    type Error = InvalidPath;
+    type Error = PathError;
 
     fn try_from(value: &'segment [u8]) -> Result<Self, Self::Error> {
         let mut bytes = value.iter();
@@ -1013,7 +1010,7 @@ impl<'segment> TryFrom<&'segment [u8]> for Segment<'segment> {
 
         while let Some(&byte) = bytes.next() {
             match PATH_CHAR_MAP[byte as usize] {
-                0 => return Err(InvalidPath::InvalidCharacter),
+                0 => return Err(PathError::InvalidCharacter),
                 b'%' => {
                     match get_percent_encoded_value(bytes.next().cloned(), bytes.next().cloned()) {
                         Ok((hex_value, uppercase)) => {
@@ -1021,7 +1018,7 @@ impl<'segment> TryFrom<&'segment [u8]> for Segment<'segment> {
                                 normalized = false;
                             }
                         }
-                        Err(_) => return Err(InvalidPath::InvalidPercentEncoding),
+                        Err(_) => return Err(PathError::InvalidPercentEncoding),
                     }
                 }
                 _ => (),
@@ -1038,7 +1035,7 @@ impl<'segment> TryFrom<&'segment [u8]> for Segment<'segment> {
 }
 
 impl<'segment> TryFrom<&'segment str> for Segment<'segment> {
-    type Error = InvalidPath;
+    type Error = PathError;
 
     fn try_from(value: &'segment str) -> Result<Self, Self::Error> {
         Segment::try_from(value.as_bytes())
@@ -1048,7 +1045,7 @@ impl<'segment> TryFrom<&'segment str> for Segment<'segment> {
 /// An error representing an invalid path.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
-pub enum InvalidPath {
+pub enum PathError {
     /// The path exceeded the maximum length allowed. Due to implementation reasons, the maximum
     /// length a path can be is 2^16 or 65536 characters.
     ExceededMaximumLength,
@@ -1060,32 +1057,28 @@ pub enum InvalidPath {
     InvalidPercentEncoding,
 }
 
-impl Display for InvalidPath {
+impl Display for PathError {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        formatter.write_str(self.description())
-    }
-}
-
-impl Error for InvalidPath {
-    fn description(&self) -> &str {
-        use self::InvalidPath::*;
+        use self::PathError::*;
 
         match self {
-            ExceededMaximumLength => "exceeded maximum path length",
-            InvalidCharacter => "invalid path character",
-            InvalidPercentEncoding => "invalid path percent encoding",
+            ExceededMaximumLength => write!(formatter, "exceeded maximum path length"),
+            InvalidCharacter => write!(formatter, "invalid path character"),
+            InvalidPercentEncoding => write!(formatter, "invalid path percent encoding"),
         }
     }
 }
 
-impl From<Infallible> for InvalidPath {
+impl Error for PathError {}
+
+impl From<Infallible> for PathError {
     fn from(_: Infallible) -> Self {
-        InvalidPath::InvalidCharacter
+        PathError::InvalidCharacter
     }
 }
 
 /// Parses the path from the given byte string.
-pub(crate) fn parse_path(value: &[u8]) -> Result<(Path, &[u8]), InvalidPath> {
+pub(crate) fn parse_path(value: &[u8]) -> Result<(Path, &[u8]), PathError> {
     struct SegmentInfo {
         absolute: bool,
         double_dot_segment_count: u16,
@@ -1185,10 +1178,10 @@ pub(crate) fn parse_path(value: &[u8]) -> Result<(Path, &[u8]), InvalidPath> {
                 segment_info.index = segment_info
                     .index
                     .checked_add(1)
-                    .ok_or(InvalidPath::ExceededMaximumLength)?;
+                    .ok_or(PathError::ExceededMaximumLength)?;
                 segment_info.normalized = true;
             }
-            0 => return Err(InvalidPath::InvalidCharacter),
+            0 => return Err(PathError::InvalidCharacter),
             b'%' => match get_percent_encoded_value(bytes.next().cloned(), bytes.next().cloned()) {
                 Ok((hex_value, uppercase)) => {
                     if !uppercase || UNRESERVED_CHAR_MAP[hex_value as usize] != 0 {
@@ -1197,7 +1190,7 @@ pub(crate) fn parse_path(value: &[u8]) -> Result<(Path, &[u8]), InvalidPath> {
 
                     segment_end_index += 3;
                 }
-                Err(_) => return Err(InvalidPath::InvalidPercentEncoding),
+                Err(_) => return Err(PathError::InvalidPercentEncoding),
             },
             _ => segment_end_index += 1,
         }
@@ -1293,7 +1286,7 @@ mod test {
 
     #[test]
     fn test_path_parse() {
-        use self::InvalidPath::*;
+        use self::PathError::*;
 
         let slash = "/".to_string();
 
@@ -1365,7 +1358,7 @@ mod test {
 
     #[test]
     fn test_segment_parse() {
-        use self::InvalidPath::*;
+        use self::PathError::*;
 
         assert_eq!(Segment::try_from("").unwrap(), "");
         assert_eq!(Segment::try_from("segment").unwrap(), "segment");

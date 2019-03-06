@@ -263,7 +263,7 @@ impl<'a, 'query> PartialEq<Query<'query>> for &'a str {
 }
 
 impl<'query> TryFrom<&'query [u8]> for Query<'query> {
-    type Error = InvalidQuery;
+    type Error = QueryError;
 
     fn try_from(value: &'query [u8]) -> Result<Self, Self::Error> {
         let (query, rest) = parse_query(value)?;
@@ -271,13 +271,13 @@ impl<'query> TryFrom<&'query [u8]> for Query<'query> {
         if rest.is_empty() {
             Ok(query)
         } else {
-            Err(InvalidQuery::InvalidCharacter)
+            Err(QueryError::InvalidCharacter)
         }
     }
 }
 
 impl<'query> TryFrom<&'query str> for Query<'query> {
-    type Error = InvalidQuery;
+    type Error = QueryError;
 
     fn try_from(value: &'query str) -> Result<Self, Self::Error> {
         Query::try_from(value.as_bytes())
@@ -287,7 +287,7 @@ impl<'query> TryFrom<&'query str> for Query<'query> {
 /// An error representing an invalid query.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
-pub enum InvalidQuery {
+pub enum QueryError {
     /// The fragment contained an invalid character.
     InvalidCharacter,
 
@@ -295,31 +295,27 @@ pub enum InvalidQuery {
     InvalidPercentEncoding,
 }
 
-impl Display for InvalidQuery {
+impl Display for QueryError {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        formatter.write_str(self.description())
-    }
-}
-
-impl Error for InvalidQuery {
-    fn description(&self) -> &str {
-        use self::InvalidQuery::*;
+        use self::QueryError::*;
 
         match self {
-            InvalidCharacter => "invalid query character",
-            InvalidPercentEncoding => "invalid query percent encoding",
+            InvalidCharacter => write!(formatter, "invalid query character"),
+            InvalidPercentEncoding => write!(formatter, "invalid query percent encoding"),
         }
     }
 }
 
-impl From<Infallible> for InvalidQuery {
+impl Error for QueryError {}
+
+impl From<Infallible> for QueryError {
     fn from(_: Infallible) -> Self {
-        InvalidQuery::InvalidCharacter
+        QueryError::InvalidCharacter
     }
 }
 
 /// Parses the query from the given byte string.
-pub(crate) fn parse_query(value: &[u8]) -> Result<(Query, &[u8]), InvalidQuery> {
+pub(crate) fn parse_query(value: &[u8]) -> Result<(Query, &[u8]), QueryError> {
     let mut bytes = value.iter();
     let mut end_index = 0;
     let mut normalized = true;
@@ -327,7 +323,7 @@ pub(crate) fn parse_query(value: &[u8]) -> Result<(Query, &[u8]), InvalidQuery> 
     while let Some(&byte) = bytes.next() {
         match QUERY_CHAR_MAP[byte as usize] {
             0 if byte == b'#' => break,
-            0 => return Err(InvalidQuery::InvalidCharacter),
+            0 => return Err(QueryError::InvalidCharacter),
             b'%' => match get_percent_encoded_value(bytes.next().cloned(), bytes.next().cloned()) {
                 Ok((hex_value, uppercase)) => {
                     if !uppercase || UNRESERVED_CHAR_MAP[hex_value as usize] != 0 {
@@ -336,7 +332,7 @@ pub(crate) fn parse_query(value: &[u8]) -> Result<(Query, &[u8]), InvalidQuery> 
 
                     end_index += 3;
                 }
-                Err(_) => return Err(InvalidQuery::InvalidPercentEncoding),
+                Err(_) => return Err(QueryError::InvalidPercentEncoding),
             },
             _ => end_index += 1,
         }
@@ -371,7 +367,7 @@ mod test {
 
     #[test]
     fn test_query_parse() {
-        use self::InvalidQuery::*;
+        use self::QueryError::*;
 
         assert_eq!(Query::try_from("").unwrap(), "");
         assert_eq!(Query::try_from("query").unwrap(), "query");

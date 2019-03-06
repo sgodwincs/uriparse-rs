@@ -172,7 +172,7 @@ macro_rules! schemes {
         }
 
         /// Parses the scheme from the given byte string.
-        pub(crate) fn parse_scheme(value: &[u8]) -> Result<(Scheme, &[u8]), InvalidScheme> {
+        pub(crate) fn parse_scheme(value: &[u8]) -> Result<(Scheme, &[u8]), SchemeError> {
             fn unregistered_scheme(value: &[u8], normalized: bool) -> Scheme {
                 // Unsafe: The loop below makes sure the byte string is valid ASCII-US.
                 let scheme = unsafe { str::from_utf8_unchecked(value) };
@@ -182,8 +182,8 @@ macro_rules! schemes {
                 })
             }
 
-            if !value.iter().next().ok_or(InvalidScheme::CannotBeEmpty)?.is_ascii_alphabetic() {
-                return Err(InvalidScheme::MustStartWithAlphabetic);
+            if !value.iter().next().ok_or(SchemeError::Empty)?.is_ascii_alphabetic() {
+                return Err(SchemeError::StartsWithNonAlphabetic);
             }
 
             let mut end_index = 0;
@@ -193,7 +193,7 @@ macro_rules! schemes {
             for &byte in value.iter() {
                 match SCHEME_CHAR_MAP[byte as usize] {
                     0 if byte == b':' => break,
-                    0 => return Err(InvalidScheme::InvalidCharacter),
+                    0 => return Err(SchemeError::InvalidCharacter),
                     _ => {
                         if byte >= b'A' && byte <= b'Z' {
                             normalized = false;
@@ -333,7 +333,7 @@ impl<'a, 'scheme> PartialEq<Scheme<'scheme>> for &'a str {
 }
 
 impl<'scheme> TryFrom<&'scheme [u8]> for Scheme<'scheme> {
-    type Error = InvalidScheme;
+    type Error = SchemeError;
 
     fn try_from(value: &'scheme [u8]) -> Result<Scheme<'scheme>, Self::Error> {
         let (scheme, rest) = parse_scheme(value)?;
@@ -341,13 +341,13 @@ impl<'scheme> TryFrom<&'scheme [u8]> for Scheme<'scheme> {
         if rest.is_empty() {
             Ok(scheme)
         } else {
-            Err(InvalidScheme::InvalidCharacter)
+            Err(SchemeError::InvalidCharacter)
         }
     }
 }
 
 impl<'scheme> TryFrom<&'scheme str> for Scheme<'scheme> {
-    type Error = InvalidScheme;
+    type Error = SchemeError;
 
     fn try_from(value: &'scheme str) -> Result<Scheme<'scheme>, Self::Error> {
         Scheme::try_from(value.as_bytes())
@@ -534,18 +534,18 @@ impl<'a, 'scheme> PartialEq<UnregisteredScheme<'scheme>> for &'a str {
 }
 
 impl<'scheme> TryFrom<&'scheme [u8]> for UnregisteredScheme<'scheme> {
-    type Error = InvalidUnregisteredScheme;
+    type Error = UnregisteredSchemeError;
 
     fn try_from(value: &'scheme [u8]) -> Result<Self, Self::Error> {
         match Scheme::try_from(value) {
             Ok(Scheme::Unregistered(scheme)) => Ok(scheme),
-            _ => Err(InvalidUnregisteredScheme),
+            _ => Err(UnregisteredSchemeError),
         }
     }
 }
 
 impl<'scheme> TryFrom<&'scheme str> for UnregisteredScheme<'scheme> {
-    type Error = InvalidUnregisteredScheme;
+    type Error = UnregisteredSchemeError;
 
     fn try_from(value: &'scheme str) -> Result<Self, Self::Error> {
         UnregisteredScheme::try_from(value.as_bytes())
@@ -555,57 +555,51 @@ impl<'scheme> TryFrom<&'scheme str> for UnregisteredScheme<'scheme> {
 /// An error representing an invalid scheme.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
-pub enum InvalidScheme {
+pub enum SchemeError {
     /// The scheme component was empty.
-    CannotBeEmpty,
+    Empty,
 
     /// The scheme contained an invalid scheme character.
     InvalidCharacter,
 
     /// The scheme did not start with an alphabetic character.
-    MustStartWithAlphabetic,
+    StartsWithNonAlphabetic,
 }
 
-impl Display for InvalidScheme {
+impl Display for SchemeError {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        formatter.write_str(self.description())
-    }
-}
-
-impl Error for InvalidScheme {
-    fn description(&self) -> &str {
-        use self::InvalidScheme::*;
+        use self::SchemeError::*;
 
         match self {
-            CannotBeEmpty => "scheme cannot be empty",
-            InvalidCharacter => "invalid scheme character",
-            MustStartWithAlphabetic => "scheme must start with alphabetic character",
+            Empty => write!(formatter, "scheme is empty"),
+            InvalidCharacter => write!(formatter, "invalid scheme character"),
+            MustStartWithAlphabetic => {
+                write!(formatter, "scheme starts with non-alphabetic character")
+            }
         }
     }
 }
 
-impl From<Infallible> for InvalidScheme {
+impl Error for SchemeError {}
+
+impl From<Infallible> for SchemeError {
     fn from(_: Infallible) -> Self {
-        InvalidScheme::InvalidCharacter
+        SchemeError::InvalidCharacter
     }
 }
 
 /// An error representing that the unregistered scheme was an invalid scheme, or it was actually
 /// a registered scheme.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct InvalidUnregisteredScheme;
+pub struct UnregisteredSchemeError;
 
-impl Display for InvalidUnregisteredScheme {
+impl Display for UnregisteredSchemeError {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        formatter.write_str(self.description())
+        write!(formatter, "invalid unregistered scheme")
     }
 }
 
-impl Error for InvalidUnregisteredScheme {
-    fn description(&self) -> &str {
-        "invalid unregistered URI scheme"
-    }
-}
+impl Error for UnregisteredSchemeError {}
 
 /// The registration status of a scheme. See [RFC 7595](https://tools.ietf.org/html/rfc7595) for
 /// more information.
@@ -1014,14 +1008,14 @@ mod test {
 
     #[test]
     fn test_scheme_parse() {
-        use self::InvalidScheme::*;
+        use self::SchemeError::*;
 
         assert_eq!(Scheme::try_from("scheme").unwrap(), "scheme");
         assert_eq!(Scheme::try_from("HTTP").unwrap(), "http");
         assert_eq!(Scheme::try_from("SCHEME").unwrap(), "SCHEME");
 
-        assert_eq!(Scheme::try_from(""), Err(CannotBeEmpty));
+        assert_eq!(Scheme::try_from(""), Err(Empty));
         assert_eq!(Scheme::try_from("a:"), Err(InvalidCharacter));
-        assert_eq!(Scheme::try_from("1"), Err(MustStartWithAlphabetic));
+        assert_eq!(Scheme::try_from("1"), Err(StartsWithNonAlphabetic));
     }
 }

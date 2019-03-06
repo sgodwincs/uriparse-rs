@@ -175,23 +175,23 @@ impl<'authority> Authority<'authority> {
     /// ```
     pub fn from_parts<
         'new_authority,
-        UsernameType,
-        PasswordType,
-        HostType,
-        UsernameError,
-        PasswordError,
-        HostError,
+        TUsername,
+        TPassword,
+        THost,
+        TUsernameError,
+        TPasswordError,
+        THostError,
     >(
-        username: Option<UsernameType>,
-        password: Option<PasswordType>,
-        host: HostType,
+        username: Option<TUsername>,
+        password: Option<TPassword>,
+        host: THost,
         port: Option<u16>,
-    ) -> Result<Authority<'new_authority>, InvalidAuthority>
+    ) -> Result<Authority<'new_authority>, AuthorityError>
     where
-        Username<'new_authority>: TryFrom<UsernameType, Error = UsernameError>,
-        Password<'new_authority>: TryFrom<PasswordType, Error = PasswordError>,
-        Host<'new_authority>: TryFrom<HostType, Error = HostError>,
-        InvalidAuthority: From<UsernameError> + From<PasswordError> + From<HostError>,
+        Username<'new_authority>: TryFrom<TUsername, Error = TUsernameError>,
+        Password<'new_authority>: TryFrom<TPassword, Error = TPasswordError>,
+        Host<'new_authority>: TryFrom<THost, Error = THostError>,
+        AuthorityError: From<TUsernameError> + From<TPasswordError> + From<THostError>,
     {
         let username = match username {
             Some(username) => Some(Username::try_from(username)?),
@@ -393,9 +393,9 @@ impl<'authority> Authority<'authority> {
     /// authority.map_host(|_| Host::try_from("127.0.0.1").unwrap());
     /// assert_eq!(authority.to_string(), "127.0.0.1");
     /// ```
-    pub fn map_host<Mapper>(&mut self, mapper: Mapper) -> &Host<'authority>
+    pub fn map_host<TMapper>(&mut self, mapper: TMapper) -> &Host<'authority>
     where
-        Mapper: FnOnce(Host<'authority>) -> Host<'authority>,
+        TMapper: FnOnce(Host<'authority>) -> Host<'authority>,
     {
         let temp_host = Host::RegisteredName(RegisteredName {
             normalized: true,
@@ -419,9 +419,9 @@ impl<'authority> Authority<'authority> {
     /// authority.map_password(|_| Some(Password::try_from("password").unwrap()));
     /// assert_eq!(authority.to_string(), ":password@example.com");
     /// ```
-    pub fn map_password<Mapper>(&mut self, mapper: Mapper) -> Option<&Password<'authority>>
+    pub fn map_password<TMapper>(&mut self, mapper: TMapper) -> Option<&Password<'authority>>
     where
-        Mapper: FnOnce(Option<Password<'authority>>) -> Option<Password<'authority>>,
+        TMapper: FnOnce(Option<Password<'authority>>) -> Option<Password<'authority>>,
     {
         let password = mapper(self.password.take());
         self.set_password(password)
@@ -441,9 +441,9 @@ impl<'authority> Authority<'authority> {
     /// authority.map_port(|_| Some(8080));
     /// assert_eq!(authority.to_string(), "example.com:8080");
     /// ```
-    pub fn map_port<Mapper>(&mut self, mapper: Mapper) -> Option<u16>
+    pub fn map_port<TMapper>(&mut self, mapper: TMapper) -> Option<u16>
     where
-        Mapper: FnOnce(Option<u16>) -> Option<u16>,
+        TMapper: FnOnce(Option<u16>) -> Option<u16>,
     {
         let port = mapper(self.port);
         self.set_port(port)
@@ -462,9 +462,9 @@ impl<'authority> Authority<'authority> {
     /// authority.map_username(|_| Some(Username::try_from("username").unwrap()));
     /// assert_eq!(authority.to_string(), "username@example.com");
     /// ```
-    pub fn map_username<Mapper>(&mut self, mapper: Mapper) -> Option<&Username<'authority>>
+    pub fn map_username<TMapper>(&mut self, mapper: TMapper) -> Option<&Username<'authority>>
     where
-        Mapper: FnOnce(Option<Username<'authority>>) -> Option<Username<'authority>>,
+        TMapper: FnOnce(Option<Username<'authority>>) -> Option<Username<'authority>>,
     {
         let username = mapper(self.username.take());
         self.set_username(username)
@@ -561,13 +561,13 @@ impl<'authority> Authority<'authority> {
     /// authority.set_host(Host::IPv6Address("::1".parse().unwrap()));
     /// assert_eq!(authority.to_string(), "[::1]:8080");
     /// ```
-    pub fn set_host<HostType, HostError>(
+    pub fn set_host<THost, THostError>(
         &mut self,
-        host: HostType,
-    ) -> Result<&Host<'authority>, InvalidAuthority>
+        host: THost,
+    ) -> Result<&Host<'authority>, AuthorityError>
     where
-        Host<'authority>: TryFrom<HostType, Error = HostError>,
-        InvalidAuthority: From<HostError>,
+        Host<'authority>: TryFrom<THost, Error = THostError>,
+        AuthorityError: From<THostError>,
     {
         self.host = Host::try_from(host)?;
         Ok(self.host())
@@ -591,13 +591,13 @@ impl<'authority> Authority<'authority> {
     /// authority.set_password(Some("secret"));
     /// assert_eq!(authority.to_string(), ":secret@example.com");
     /// ```
-    pub fn set_password<PasswordType, PasswordError>(
+    pub fn set_password<TPassword, TPasswordError>(
         &mut self,
-        password: Option<PasswordType>,
-    ) -> Result<Option<&Password<'authority>>, InvalidAuthority>
+        password: Option<TPassword>,
+    ) -> Result<Option<&Password<'authority>>, AuthorityError>
     where
-        Password<'authority>: TryFrom<PasswordType, Error = PasswordError>,
-        InvalidAuthority: From<PasswordError>,
+        Password<'authority>: TryFrom<TPassword, Error = TPasswordError>,
+        AuthorityError: From<TPasswordError>,
     {
         self.password = match password {
             Some(password) => {
@@ -656,13 +656,13 @@ impl<'authority> Authority<'authority> {
     /// authority.set_username(None::<Username>);
     /// assert_eq!(authority.to_string(), "example.com");
     /// ```
-    pub fn set_username<UsernameType, UsernameError>(
+    pub fn set_username<TUsername, TUsernameError>(
         &mut self,
-        username: Option<UsernameType>,
-    ) -> Result<Option<&Username<'authority>>, InvalidAuthority>
+        username: Option<TUsername>,
+    ) -> Result<Option<&Username<'authority>>, AuthorityError>
     where
-        Username<'authority>: TryFrom<UsernameType, Error = UsernameError>,
-        InvalidAuthority: From<UsernameError>,
+        Username<'authority>: TryFrom<TUsername, Error = TUsernameError>,
+        AuthorityError: From<TUsernameError>,
     {
         self.username = match username {
             Some(username) => Some(Username::try_from(username)?),
@@ -727,7 +727,7 @@ impl<'authority> From<Authority<'authority>> for String {
 }
 
 impl<'authority> TryFrom<&'authority [u8]> for Authority<'authority> {
-    type Error = InvalidAuthority;
+    type Error = AuthorityError;
 
     fn try_from(value: &'authority [u8]) -> Result<Self, Self::Error> {
         let (authority, rest) = parse_authority(value)?;
@@ -735,21 +735,19 @@ impl<'authority> TryFrom<&'authority [u8]> for Authority<'authority> {
         if rest.is_empty() {
             Ok(authority)
         } else if authority.has_port() {
-            Err(InvalidAuthority::InvalidPort(InvalidPort::InvalidCharacter))
+            Err(AuthorityError::Port(PortError::InvalidCharacter))
         } else if authority.host().is_ipv6_address() {
-            Err(InvalidAuthority::InvalidHost(
-                InvalidHost::InvalidIPv6Character,
-            ))
+            Err(AuthorityError::Host(HostError::InvalidIPv6Character))
         } else {
-            Err(InvalidAuthority::InvalidHost(
-                InvalidHost::InvalidIPv4OrRegisteredNameCharacter,
+            Err(AuthorityError::Host(
+                HostError::InvalidIPv4OrRegisteredNameCharacter,
             ))
         }
     }
 }
 
 impl<'authority> TryFrom<&'authority str> for Authority<'authority> {
-    type Error = InvalidAuthority;
+    type Error = AuthorityError;
 
     fn try_from(value: &'authority str) -> Result<Self, Self::Error> {
         Authority::try_from(value.as_bytes())
@@ -966,7 +964,7 @@ impl From<Ipv6Addr> for Host<'static> {
 }
 
 impl<'host> TryFrom<&'host [u8]> for Host<'host> {
-    type Error = InvalidHost;
+    type Error = HostError;
 
     fn try_from(value: &'host [u8]) -> Result<Self, Self::Error> {
         if value.is_empty() {
@@ -988,9 +986,9 @@ impl<'host> TryFrom<&'host [u8]> for Host<'host> {
                         let ipvfuture = &value[3..value.len() - 1];
 
                         if check_ipvfuture(ipvfuture) {
-                            return Err(InvalidHost::AddressMechanismNotSupported);
+                            return Err(HostError::AddressMechanismNotSupported);
                         } else {
-                            return Err(InvalidHost::InvalidIPvFutureCharacter);
+                            return Err(HostError::InvalidIPvFutureCharacter);
                         }
                     }
                     _ => (),
@@ -1001,13 +999,13 @@ impl<'host> TryFrom<&'host [u8]> for Host<'host> {
                 let ipv6 = &value[1..value.len() - 1];
 
                 if !check_ipv6(ipv6) {
-                    return Err(InvalidHost::InvalidIPv6Character);
+                    return Err(HostError::InvalidIPv6Character);
                 }
 
                 // Unsafe: The function above [`check_ipv6`] ensures this is valid ASCII-US.
                 let ipv6: Ipv6Addr = unsafe { str::from_utf8_unchecked(ipv6) }
                     .parse()
-                    .map_err(|_| InvalidHost::InvalidIPv6Format)?;
+                    .map_err(|_| HostError::InvalidIPv6Format)?;
                 Ok(Host::IPv6Address(ipv6))
             }
             _ => {
@@ -1026,7 +1024,7 @@ impl<'host> TryFrom<&'host [u8]> for Host<'host> {
                         })),
                     }
                 } else {
-                    Err(InvalidHost::InvalidIPv4OrRegisteredNameCharacter)
+                    Err(HostError::InvalidIPv4OrRegisteredNameCharacter)
                 }
             }
         }
@@ -1034,7 +1032,7 @@ impl<'host> TryFrom<&'host [u8]> for Host<'host> {
 }
 
 impl<'host> TryFrom<&'host str> for Host<'host> {
-    type Error = InvalidHost;
+    type Error = HostError;
 
     fn try_from(value: &'host str) -> Result<Self, Self::Error> {
         Host::try_from(value.as_bytes())
@@ -1266,7 +1264,7 @@ impl<'a, 'password> PartialEq<Password<'password>> for &'a str {
 }
 
 impl<'password> TryFrom<&'password [u8]> for Password<'password> {
-    type Error = InvalidUserInfo;
+    type Error = PasswordError;
 
     fn try_from(value: &'password [u8]) -> Result<Self, Self::Error> {
         let normalized = check_user_info(value, false)?;
@@ -1280,7 +1278,7 @@ impl<'password> TryFrom<&'password [u8]> for Password<'password> {
 }
 
 impl<'password> TryFrom<&'password str> for Password<'password> {
-    type Error = InvalidUserInfo;
+    type Error = PasswordError;
 
     fn try_from(value: &'password str) -> Result<Self, Self::Error> {
         Password::try_from(value.as_bytes())
@@ -1510,18 +1508,18 @@ impl<'a, 'name> PartialEq<RegisteredName<'name>> for &'a str {
 }
 
 impl<'name> TryFrom<&'name [u8]> for RegisteredName<'name> {
-    type Error = InvalidRegisteredName;
+    type Error = RegisteredNameError;
 
     fn try_from(value: &'name [u8]) -> Result<Self, Self::Error> {
         match Host::try_from(value) {
             Ok(Host::RegisteredName(name)) => Ok(name),
-            _ => Err(InvalidRegisteredName),
+            _ => Err(RegisteredNameError),
         }
     }
 }
 
 impl<'name> TryFrom<&'name str> for RegisteredName<'name> {
-    type Error = InvalidRegisteredName;
+    type Error = RegisteredNameError;
 
     fn try_from(value: &'name str) -> Result<Self, Self::Error> {
         RegisteredName::try_from(value.as_bytes())
@@ -1750,7 +1748,7 @@ impl<'a, 'username> PartialEq<Username<'username>> for &'a str {
 }
 
 impl<'username> TryFrom<&'username [u8]> for Username<'username> {
-    type Error = InvalidUserInfo;
+    type Error = UsernameError;
 
     fn try_from(value: &'username [u8]) -> Result<Self, Self::Error> {
         let normalized = check_user_info(value, true)?;
@@ -1764,7 +1762,7 @@ impl<'username> TryFrom<&'username [u8]> for Username<'username> {
 }
 
 impl<'username> TryFrom<&'username str> for Username<'username> {
-    type Error = InvalidUserInfo;
+    type Error = UsernameError;
 
     fn try_from(value: &'username str) -> Result<Self, Self::Error> {
         Username::try_from(value.as_bytes())
@@ -1774,63 +1772,80 @@ impl<'username> TryFrom<&'username str> for Username<'username> {
 /// An error representing an invalid authority.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
-pub enum InvalidAuthority {
+pub enum AuthorityError {
     /// The host component of the authority was invalid.
-    InvalidHost(InvalidHost),
+    Host(HostError),
+
+    /// The password component of the authority was invalid.
+    Password(PasswordError),
 
     /// The port component of the authority was invalid.
-    InvalidPort(InvalidPort),
+    Port(PortError),
 
-    /// The user information component of the authority was invalid.
-    InvalidUserInfo(InvalidUserInfo),
+    /// The username component of the authority was invalid.
+    Username(UsernameError),
 }
 
-impl Display for InvalidAuthority {
+impl Display for AuthorityError {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        formatter.write_str(self.description())
-    }
-}
-
-impl Error for InvalidAuthority {
-    fn description(&self) -> &str {
-        use self::InvalidAuthority::*;
+        use self::AuthorityError::*;
 
         match self {
-            InvalidHost(invalid_host) => invalid_host.description(),
-            InvalidPort(invalid_port) => invalid_port.description(),
-            InvalidUserInfo(invalid_user_info) => invalid_user_info.description(),
+            Host(error) => error.fmt(formatter),
+            Password(error) => error.fmt(formatter),
+            Port(error) => error.fmt(formatter),
+            Username(error) => error.fmt(formatter),
         }
     }
 }
 
-impl From<Infallible> for InvalidAuthority {
+impl Error for AuthorityError {}
+
+impl From<Infallible> for AuthorityError {
     fn from(_: Infallible) -> Self {
-        InvalidAuthority::InvalidHost(InvalidHost::InvalidIPv4OrRegisteredNameCharacter)
+        AuthorityError::Host(HostError::InvalidIPv4OrRegisteredNameCharacter)
     }
 }
 
-impl From<InvalidHost> for InvalidAuthority {
-    fn from(value: InvalidHost) -> Self {
-        InvalidAuthority::InvalidHost(value)
+impl From<HostError> for AuthorityError {
+    fn from(value: HostError) -> Self {
+        AuthorityError::Host(value)
     }
 }
 
-impl From<InvalidPort> for InvalidAuthority {
-    fn from(value: InvalidPort) -> Self {
-        InvalidAuthority::InvalidPort(value)
+impl From<PasswordError> for AuthorityError {
+    fn from(value: PasswordError) -> Self {
+        AuthorityError::Password(value)
     }
 }
 
-impl From<InvalidUserInfo> for InvalidAuthority {
-    fn from(value: InvalidUserInfo) -> Self {
-        InvalidAuthority::InvalidUserInfo(value)
+impl From<PortError> for AuthorityError {
+    fn from(value: PortError) -> Self {
+        AuthorityError::Port(value)
+    }
+}
+
+impl From<UserInfoError> for AuthorityError {
+    fn from(value: UserInfoError) -> Self {
+        use self::AuthorityError::*;
+
+        match value {
+            UserInfoError::Password(error) => Password(error),
+            UserInfoError::Username(error) => Username(error),
+        }
+    }
+}
+
+impl From<UsernameError> for AuthorityError {
+    fn from(value: UsernameError) -> Self {
+        AuthorityError::Username(value)
     }
 }
 
 /// An error representing an invalid host.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
-pub enum InvalidHost {
+pub enum HostError {
     /// The syntax for a future IP literal was used and is not currently supported.
     AddressMechanismNotSupported,
 
@@ -1852,36 +1867,75 @@ pub enum InvalidHost {
     InvalidIPvFutureCharacter,
 }
 
-impl Display for InvalidHost {
+impl Display for HostError {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        formatter.write_str(self.description())
-    }
-}
-
-impl Error for InvalidHost {
-    fn description(&self) -> &str {
-        use self::InvalidHost::*;
+        use self::HostError::*;
 
         match self {
-            AddressMechanismNotSupported => "address mechanism not supported",
-            InvalidIPv4OrRegisteredNameCharacter => "invalid IPv4 or registered name character",
-            InvalidIPv6Character => "invalid IPv6 character",
-            InvalidIPv6Format => "invalid IPv6 format",
-            InvalidIPvFutureCharacter => "invalid IPvFuture character",
+            AddressMechanismNotSupported => {
+                write!(formatter, "host address mechanism not supported")
+            }
+            InvalidIPv4OrRegisteredNameCharacter => {
+                write!(formatter, "invalid host IPv4 or registered name character")
+            }
+            InvalidIPv6Character => write!(formatter, "invalid host IPv6 character"),
+            InvalidIPv6Format => write!(formatter, "invalid host IPv6 format"),
+            InvalidIPvFutureCharacter => write!(formatter, "invalid host IPvFuture character"),
         }
     }
 }
 
-impl From<Infallible> for InvalidHost {
+impl Error for HostError {}
+
+impl From<Infallible> for HostError {
     fn from(_: Infallible) -> Self {
-        InvalidHost::InvalidIPv4OrRegisteredNameCharacter
+        HostError::InvalidIPv4OrRegisteredNameCharacter
+    }
+}
+
+/// An error representing an invalid password component.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum PasswordError {
+    /// The password contained an invalid character.
+    InvalidCharacter,
+
+    /// The password contained an invalid percent encoding (e.g. `"%ZZ"`).
+    InvalidPercentEncoding,
+}
+
+impl Display for PasswordError {
+    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
+        use self::PasswordError::*;
+
+        match self {
+            InvalidCharacter => write!(formatter, "invalid password character"),
+            InvalidPercentEncoding => write!(formatter, "invalid password percent encoding"),
+        }
+    }
+}
+
+impl Error for PasswordError {}
+
+impl From<Infallible> for PasswordError {
+    fn from(_: Infallible) -> Self {
+        PasswordError::InvalidCharacter
+    }
+}
+
+impl From<UserInfoError> for PasswordError {
+    fn from(value: UserInfoError) -> Self {
+        match value {
+            UserInfoError::Password(error) => error,
+            _ => panic!("unexpected user info error"),
+        }
     }
 }
 
 /// An error representing an invalid port.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
-pub enum InvalidPort {
+pub enum PortError {
     /// An invalid character was used in the port. Only decimal digits are allowed.
     InvalidCharacter,
 
@@ -1889,26 +1943,22 @@ pub enum InvalidPort {
     Overflow,
 }
 
-impl Display for InvalidPort {
+impl Display for PortError {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        formatter.write_str(self.description())
-    }
-}
-
-impl Error for InvalidPort {
-    fn description(&self) -> &str {
-        use self::InvalidPort::*;
+        use self::PortError::*;
 
         match self {
-            InvalidCharacter => "invalid port character",
-            Overflow => "port overflow",
+            InvalidCharacter => write!(formatter, "invalid port character"),
+            Overflow => write!(formatter, "port overflow"),
         }
     }
 }
 
-impl From<Infallible> for InvalidPort {
+impl Error for PortError {}
+
+impl From<Infallible> for PortError {
     fn from(_: Infallible) -> Self {
-        InvalidPort::InvalidCharacter
+        PortError::InvalidCharacter
     }
 }
 
@@ -1918,57 +1968,100 @@ impl From<Infallible> for InvalidPort {
 /// percent encoding. This error is not possible from parsing an authority. It can only be returned
 /// from directly parsing a registered name.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct InvalidRegisteredName;
+pub struct RegisteredNameError;
 
-impl Display for InvalidRegisteredName {
+impl Display for RegisteredNameError {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        formatter.write_str(self.description())
+        write!(formatter, "invalid registered name")
     }
 }
 
-impl Error for InvalidRegisteredName {
-    fn description(&self) -> &str {
-        "invalid registered name"
-    }
-}
+impl Error for RegisteredNameError {}
 
 /// An error representing an invalid user information component.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
-pub enum InvalidUserInfo {
-    /// The user information contained an invalid character.
-    InvalidCharacter,
+enum UserInfoError {
+    /// The password component of the user information was invalid.
+    Password(PasswordError),
 
-    /// The user information contained an invalid percent encoding (e.g. `"%ZZ"`).
-    InvalidPercentEncoding,
-
-    /// The username contained a `':'` which is only to be used as a delimiter between the username
-    /// and password. This variant can only happen when trying to directly parse a username from a
-    /// byte source.
-    UsernameCannotContainColon,
+    /// The username component of the user information was invalid.
+    Username(UsernameError),
 }
 
-impl Display for InvalidUserInfo {
+impl Display for UserInfoError {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        formatter.write_str(self.description())
-    }
-}
-
-impl Error for InvalidUserInfo {
-    fn description(&self) -> &str {
-        use self::InvalidUserInfo::*;
+        use self::UserInfoError::*;
 
         match self {
-            InvalidCharacter => "invalid user info character",
-            InvalidPercentEncoding => "invalid user info percent encoding",
-            UsernameCannotContainColon => "username cannot contain a colon character",
+            Password(error) => error.fmt(formatter),
+            Username(error) => error.fmt(formatter),
         }
     }
 }
 
-impl From<Infallible> for InvalidUserInfo {
+impl Error for UserInfoError {}
+
+impl From<Infallible> for UserInfoError {
     fn from(_: Infallible) -> Self {
-        InvalidUserInfo::InvalidCharacter
+        UserInfoError::Username(UsernameError::InvalidCharacter)
+    }
+}
+
+impl From<PasswordError> for UserInfoError {
+    fn from(value: PasswordError) -> Self {
+        UserInfoError::Password(value)
+    }
+}
+
+impl From<UsernameError> for UserInfoError {
+    fn from(value: UsernameError) -> Self {
+        UserInfoError::Username(value)
+    }
+}
+
+/// An error representing an invalid username component.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum UsernameError {
+    /// The username contained a `':'` which is only to be used as a delimiter between the username
+    /// and password. This variant can only happen when trying to directly parse a username from a
+    /// byte source.
+    ContainsColon,
+
+    /// The username contained an invalid character.
+    InvalidCharacter,
+
+    /// The username contained an invalid percent encoding (e.g. `"%ZZ"`).
+    InvalidPercentEncoding,
+}
+
+impl Display for UsernameError {
+    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
+        use self::UsernameError::*;
+
+        match self {
+            ContainsColon => write!(formatter, "username contains a colon character"),
+            InvalidCharacter => write!(formatter, "invalid username character"),
+            InvalidPercentEncoding => write!(formatter, "invalid username percent encoding"),
+        }
+    }
+}
+
+impl Error for UsernameError {}
+
+impl From<Infallible> for UsernameError {
+    fn from(_: Infallible) -> Self {
+        UsernameError::InvalidCharacter
+    }
+}
+
+impl From<UserInfoError> for UsernameError {
+    fn from(value: UserInfoError) -> Self {
+        match value {
+            UserInfoError::Username(error) => error,
+            _ => panic!("unexpected user info error"),
+        }
     }
 }
 
@@ -2022,22 +2115,34 @@ fn check_ipvfuture(value: &[u8]) -> bool {
 
 /// Checks if the user information component contains valid characters and percent encodings. If so,
 /// it will return an `Option<usize>` indicating the separator index for the username and password.
-fn check_user_info(value: &[u8], is_username: bool) -> Result<bool, InvalidUserInfo> {
+fn check_user_info(value: &[u8], is_username: bool) -> Result<bool, UserInfoError> {
     let mut bytes = value.iter();
     let mut normalized = true;
 
     while let Some(&byte) = bytes.next() {
         match USER_INFO_CHAR_MAP[byte as usize] {
-            0 => return Err(InvalidUserInfo::InvalidCharacter),
+            0 => {
+                return if is_username {
+                    Err(UsernameError::InvalidCharacter.into())
+                } else {
+                    Err(PasswordError::InvalidCharacter.into())
+                };
+            }
             b'%' => match get_percent_encoded_value(bytes.next().cloned(), bytes.next().cloned()) {
                 Ok((hex_value, uppercase)) => {
                     if !uppercase || UNRESERVED_CHAR_MAP[hex_value as usize] != 0 {
                         normalized = false;
                     }
                 }
-                Err(_) => return Err(InvalidUserInfo::InvalidPercentEncoding),
+                Err(_) => {
+                    return if is_username {
+                        Err(UsernameError::InvalidPercentEncoding.into())
+                    } else {
+                        Err(PasswordError::InvalidPercentEncoding.into())
+                    };
+                }
             },
-            b':' if is_username => return Err(InvalidUserInfo::UsernameCannotContainColon),
+            b':' if is_username => return Err(UsernameError::ContainsColon.into()),
             _ => (),
         }
     }
@@ -2046,7 +2151,7 @@ fn check_user_info(value: &[u8], is_username: bool) -> Result<bool, InvalidUserI
 }
 
 /// Parses the authority from the given byte string.
-pub(crate) fn parse_authority(value: &[u8]) -> Result<(Authority, &[u8]), InvalidAuthority> {
+pub(crate) fn parse_authority(value: &[u8]) -> Result<(Authority, &[u8]), AuthorityError> {
     let mut at_index = None;
     let mut last_colon_index = None;
     let mut end_index = value.len();
@@ -2097,7 +2202,7 @@ pub(crate) fn parse_authority(value: &[u8]) -> Result<(Authority, &[u8]), Invali
 }
 
 /// Parses the port from the given byte string.
-fn parse_port(value: &[u8]) -> Result<Option<u16>, InvalidPort> {
+fn parse_port(value: &[u8]) -> Result<Option<u16>, PortError> {
     if value.is_empty() {
         Ok(None)
     } else {
@@ -2105,13 +2210,13 @@ fn parse_port(value: &[u8]) -> Result<Option<u16>, InvalidPort> {
 
         for &byte in value {
             if !byte.is_ascii_digit() {
-                return Err(InvalidPort::InvalidCharacter);
+                return Err(PortError::InvalidCharacter);
             }
 
-            port = port.checked_mul(10).ok_or(InvalidPort::Overflow)?;
+            port = port.checked_mul(10).ok_or(PortError::Overflow)?;
             port = port
                 .checked_add((byte - b'0').into())
-                .ok_or(InvalidPort::Overflow)?;
+                .ok_or(PortError::Overflow)?;
         }
 
         Ok(Some(port))
@@ -2119,7 +2224,7 @@ fn parse_port(value: &[u8]) -> Result<Option<u16>, InvalidPort> {
 }
 
 /// Parses the user information from the given byte string.
-fn parse_user_info(value: &[u8]) -> Result<(Username, Option<Password>), InvalidUserInfo> {
+fn parse_user_info(value: &[u8]) -> Result<(Username, Option<Password>), UserInfoError> {
     let mut bytes = value.iter().enumerate();
     let mut first_colon_index = None;
     let mut password_normalized = true;
@@ -2127,7 +2232,13 @@ fn parse_user_info(value: &[u8]) -> Result<(Username, Option<Password>), Invalid
 
     while let Some((index, &byte)) = bytes.next() {
         match USER_INFO_CHAR_MAP[byte as usize] {
-            0 => return Err(InvalidUserInfo::InvalidCharacter),
+            0 => {
+                return if first_colon_index.is_some() {
+                    Err(PasswordError::InvalidCharacter.into())
+                } else {
+                    Err(UsernameError::InvalidCharacter.into())
+                }
+            }
             b'%' => match get_percent_encoded_value(
                 bytes.next().map(|(_, &byte)| byte),
                 bytes.next().map(|(_, &byte)| byte),
@@ -2141,7 +2252,13 @@ fn parse_user_info(value: &[u8]) -> Result<(Username, Option<Password>), Invalid
                         }
                     }
                 }
-                Err(_) => return Err(InvalidUserInfo::InvalidPercentEncoding),
+                Err(_) => {
+                    return if first_colon_index.is_some() {
+                        Err(PasswordError::InvalidPercentEncoding.into())
+                    } else {
+                        Err(UsernameError::InvalidPercentEncoding.into())
+                    }
+                }
             },
             b':' => {
                 if first_colon_index.is_none() {

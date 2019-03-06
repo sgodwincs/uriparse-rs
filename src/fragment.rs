@@ -259,7 +259,7 @@ impl<'a, 'fragment> PartialEq<Fragment<'fragment>> for &'a str {
 }
 
 impl<'fragment> TryFrom<&'fragment [u8]> for Fragment<'fragment> {
-    type Error = InvalidFragment;
+    type Error = FragmentError;
 
     fn try_from(value: &'fragment [u8]) -> Result<Self, Self::Error> {
         let mut bytes = value.iter();
@@ -267,7 +267,7 @@ impl<'fragment> TryFrom<&'fragment [u8]> for Fragment<'fragment> {
 
         while let Some(&byte) = bytes.next() {
             match FRAGMENT_CHAR_MAP[byte as usize] {
-                0 => return Err(InvalidFragment::InvalidCharacter),
+                0 => return Err(FragmentError::InvalidCharacter),
                 b'%' => {
                     match get_percent_encoded_value(bytes.next().cloned(), bytes.next().cloned()) {
                         Ok((hex_value, uppercase)) => {
@@ -275,7 +275,7 @@ impl<'fragment> TryFrom<&'fragment [u8]> for Fragment<'fragment> {
                                 normalized = false;
                             }
                         }
-                        Err(_) => return Err(InvalidFragment::InvalidPercentEncoding),
+                        Err(_) => return Err(FragmentError::InvalidPercentEncoding),
                     }
                 }
                 _ => (),
@@ -291,7 +291,7 @@ impl<'fragment> TryFrom<&'fragment [u8]> for Fragment<'fragment> {
 }
 
 impl<'fragment> TryFrom<&'fragment str> for Fragment<'fragment> {
-    type Error = InvalidFragment;
+    type Error = FragmentError;
 
     fn try_from(value: &'fragment str) -> Result<Self, Self::Error> {
         Fragment::try_from(value.as_bytes())
@@ -301,7 +301,7 @@ impl<'fragment> TryFrom<&'fragment str> for Fragment<'fragment> {
 /// An error representing an invalid fragment.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
-pub enum InvalidFragment {
+pub enum FragmentError {
     /// The fragment contained an invalid character.
     InvalidCharacter,
 
@@ -309,26 +309,22 @@ pub enum InvalidFragment {
     InvalidPercentEncoding,
 }
 
-impl Display for InvalidFragment {
+impl Display for FragmentError {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        formatter.write_str(self.description())
-    }
-}
-
-impl Error for InvalidFragment {
-    fn description(&self) -> &str {
-        use self::InvalidFragment::*;
+        use self::FragmentError::*;
 
         match self {
-            InvalidCharacter => "invalid fragment character",
-            InvalidPercentEncoding => "invalid fragment percent encoding",
+            InvalidCharacter => write!(formatter, "invalid fragment character"),
+            InvalidPercentEncoding => write!(formatter, "invalid fragment percent encoding"),
         }
     }
 }
 
-impl From<Infallible> for InvalidFragment {
+impl Error for FragmentError {}
+
+impl From<Infallible> for FragmentError {
     fn from(_: Infallible) -> Self {
-        InvalidFragment::InvalidCharacter
+        FragmentError::InvalidCharacter
     }
 }
 
@@ -351,7 +347,7 @@ mod test {
 
     #[test]
     fn test_fragment_parse() {
-        use self::InvalidFragment::*;
+        use self::FragmentError::*;
 
         assert_eq!(Fragment::try_from("").unwrap(), "");
         assert_eq!(Fragment::try_from("fragment").unwrap(), "fragment");

@@ -3,11 +3,11 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter, Write};
 use std::mem;
 
-use crate::authority::{parse_authority, Authority, Host, InvalidAuthority, Password, Username};
-use crate::fragment::{Fragment, InvalidFragment};
-use crate::path::{parse_path, InvalidPath, Path};
-use crate::query::{parse_query, InvalidQuery, Query};
-use crate::scheme::{parse_scheme, InvalidScheme, Scheme};
+use crate::authority::{parse_authority, Authority, AuthorityError, Host, Password, Username};
+use crate::fragment::{Fragment, FragmentError};
+use crate::path::{parse_path, Path, PathError};
+use crate::query::{parse_query, Query, QueryError};
+use crate::scheme::{parse_scheme, Scheme, SchemeError};
 
 /// A URI reference as defined in
 /// [[RFC3986, Section 4.1]](https://tools.ietf.org/html/rfc3986#section-4.1).
@@ -122,34 +122,34 @@ impl<'uri> URIReference<'uri> {
     /// ```
     pub fn from_parts<
         'new_uri,
-        SchemeType,
-        AuthorityType,
-        PathType,
-        QueryType,
-        FragmentType,
-        SchemeError,
-        AuthorityError,
-        PathError,
-        QueryError,
-        FragmentError,
+        TScheme,
+        TAuthority,
+        TPath,
+        TQuery,
+        TFragment,
+        TSchemeError,
+        TAuthorityError,
+        TPathError,
+        TQueryError,
+        TFragmentError,
     >(
-        scheme: Option<SchemeType>,
-        authority: Option<AuthorityType>,
-        path: PathType,
-        query: Option<QueryType>,
-        fragment: Option<FragmentType>,
-    ) -> Result<URIReference<'new_uri>, InvalidURIReference>
+        scheme: Option<TScheme>,
+        authority: Option<TAuthority>,
+        path: TPath,
+        query: Option<TQuery>,
+        fragment: Option<TFragment>,
+    ) -> Result<URIReference<'new_uri>, URIReferenceError>
     where
-        Scheme<'new_uri>: TryFrom<SchemeType, Error = SchemeError>,
-        Authority<'new_uri>: TryFrom<AuthorityType, Error = AuthorityError>,
-        Path<'new_uri>: TryFrom<PathType, Error = PathError>,
-        Query<'new_uri>: TryFrom<QueryType, Error = QueryError>,
-        Fragment<'new_uri>: TryFrom<FragmentType, Error = FragmentError>,
-        InvalidURIReference: From<SchemeError>
-            + From<AuthorityError>
-            + From<PathError>
-            + From<QueryError>
-            + From<FragmentError>,
+        Scheme<'new_uri>: TryFrom<TScheme, Error = TSchemeError>,
+        Authority<'new_uri>: TryFrom<TAuthority, Error = TAuthorityError>,
+        Path<'new_uri>: TryFrom<TPath, Error = TPathError>,
+        Query<'new_uri>: TryFrom<TQuery, Error = TQueryError>,
+        Fragment<'new_uri>: TryFrom<TFragment, Error = TFragmentError>,
+        URIReferenceError: From<TSchemeError>
+            + From<TAuthorityError>
+            + From<TPathError>
+            + From<TQueryError>
+            + From<TFragmentError>,
     {
         let scheme = match scheme {
             Some(scheme) => Some(Scheme::try_from(scheme)?),
@@ -619,9 +619,9 @@ impl<'uri> URIReference<'uri> {
     /// reference.map_authority(|_| Some(Authority::try_from("127.0.0.1").unwrap()));
     /// assert_eq!(reference.to_string(), "http://127.0.0.1/");
     /// ```
-    pub fn map_authority<Mapper>(&mut self, mapper: Mapper) -> Option<&Authority<'uri>>
+    pub fn map_authority<TMapper>(&mut self, mapper: TMapper) -> Option<&Authority<'uri>>
     where
-        Mapper: FnOnce(Option<Authority<'uri>>) -> Option<Authority<'uri>>,
+        TMapper: FnOnce(Option<Authority<'uri>>) -> Option<Authority<'uri>>,
     {
         let authority = mapper(self.authority.take());
         self.set_authority(authority)
@@ -641,9 +641,9 @@ impl<'uri> URIReference<'uri> {
     /// reference.map_fragment(|_| Some(Fragment::try_from("fragment").unwrap()));
     /// assert_eq!(reference.to_string(), "http://example.com/#fragment");
     /// ```
-    pub fn map_fragment<Mapper>(&mut self, mapper: Mapper) -> Option<&Fragment<'uri>>
+    pub fn map_fragment<TMapper>(&mut self, mapper: TMapper) -> Option<&Fragment<'uri>>
     where
-        Mapper: FnOnce(Option<Fragment<'uri>>) -> Option<Fragment<'uri>>,
+        TMapper: FnOnce(Option<Fragment<'uri>>) -> Option<Fragment<'uri>>,
     {
         let fragment = mapper(self.fragment.take());
         self.set_fragment(fragment)
@@ -670,9 +670,9 @@ impl<'uri> URIReference<'uri> {
     /// });
     /// assert_eq!(reference.to_string(), "http://example.com/test/path");
     /// ```
-    pub fn map_path<Mapper>(&mut self, mapper: Mapper) -> &Path<'uri>
+    pub fn map_path<TMapper>(&mut self, mapper: TMapper) -> &Path<'uri>
     where
-        Mapper: FnOnce(Path<'uri>) -> Path<'uri>,
+        TMapper: FnOnce(Path<'uri>) -> Path<'uri>,
     {
         // Unsafe: We're creating an invalid path just as a temporary sentinel value, but it is
         // replaced shortly after.
@@ -695,9 +695,9 @@ impl<'uri> URIReference<'uri> {
     /// reference.map_query(|_| Some(Query::try_from("query").unwrap()));
     /// assert_eq!(reference.to_string(), "http://example.com/?query");
     /// ```
-    pub fn map_query<Mapper>(&mut self, mapper: Mapper) -> Option<&Query<'uri>>
+    pub fn map_query<TMapper>(&mut self, mapper: TMapper) -> Option<&Query<'uri>>
     where
-        Mapper: FnOnce(Option<Query<'uri>>) -> Option<Query<'uri>>,
+        TMapper: FnOnce(Option<Query<'uri>>) -> Option<Query<'uri>>,
     {
         let query = mapper(self.query.take());
         self.set_query(query)
@@ -720,9 +720,9 @@ impl<'uri> URIReference<'uri> {
     /// reference.map_scheme(|_| Some(Scheme::try_from("https").unwrap()));
     /// assert_eq!(reference.to_string(), "https://example.com/");
     /// ```
-    pub fn map_scheme<Mapper>(&mut self, mapper: Mapper) -> Option<&Scheme<'uri>>
+    pub fn map_scheme<TMapper>(&mut self, mapper: TMapper) -> Option<&Scheme<'uri>>
     where
-        Mapper: FnOnce(Option<Scheme<'uri>>) -> Option<Scheme<'uri>>,
+        TMapper: FnOnce(Option<Scheme<'uri>>) -> Option<Scheme<'uri>>,
     {
         let scheme = mapper(self.scheme.take());
         self.set_scheme(scheme)
@@ -876,13 +876,13 @@ impl<'uri> URIReference<'uri> {
     /// reference.set_authority(Some("user@example.com:80"));
     /// assert_eq!(reference.to_string(), "http://user@example.com:80/");
     /// ```
-    pub fn set_authority<AuthorityType, AuthorityError>(
+    pub fn set_authority<TAuthority, TAuthorityError>(
         &mut self,
-        authority: Option<AuthorityType>,
-    ) -> Result<Option<&Authority<'uri>>, InvalidURIReference>
+        authority: Option<TAuthority>,
+    ) -> Result<Option<&Authority<'uri>>, URIReferenceError>
     where
-        Authority<'uri>: TryFrom<AuthorityType, Error = AuthorityError>,
-        InvalidURIReference: From<AuthorityError>,
+        Authority<'uri>: TryFrom<TAuthority, Error = TAuthorityError>,
+        URIReferenceError: From<TAuthorityError>,
     {
         self.authority = match authority {
             Some(authority) => {
@@ -912,13 +912,13 @@ impl<'uri> URIReference<'uri> {
     /// reference.set_fragment(Some("fragment"));
     /// assert_eq!(reference.to_string(), "http://example.com/#fragment");
     /// ```
-    pub fn set_fragment<FragmentType, FragmentError>(
+    pub fn set_fragment<TFragment, TFragmentError>(
         &mut self,
-        fragment: Option<FragmentType>,
-    ) -> Result<Option<&Fragment<'uri>>, InvalidURIReference>
+        fragment: Option<TFragment>,
+    ) -> Result<Option<&Fragment<'uri>>, URIReferenceError>
     where
-        Fragment<'uri>: TryFrom<FragmentType, Error = FragmentError>,
-        InvalidURIReference: From<FragmentError>,
+        Fragment<'uri>: TryFrom<TFragment, Error = TFragmentError>,
+        URIReferenceError: From<TFragmentError>,
     {
         self.fragment = match fragment {
             Some(fragment) => Some(Fragment::try_from(fragment)?),
@@ -947,13 +947,13 @@ impl<'uri> URIReference<'uri> {
     /// reference.set_path("my/path");
     /// assert_eq!(reference.to_string(), "http://example.com/my/path");
     /// ```
-    pub fn set_path<PathType, PathError>(
+    pub fn set_path<TPath, TPathError>(
         &mut self,
-        path: PathType,
-    ) -> Result<&Path<'uri>, InvalidURIReference>
+        path: TPath,
+    ) -> Result<&Path<'uri>, URIReferenceError>
     where
-        Path<'uri>: TryFrom<PathType, Error = PathError>,
-        InvalidURIReference: From<PathError>,
+        Path<'uri>: TryFrom<TPath, Error = TPathError>,
+        URIReferenceError: From<TPathError>,
     {
         let mut path = Path::try_from(path)?;
         validate_absolute_path(self.authority.as_ref(), &path)?;
@@ -982,13 +982,13 @@ impl<'uri> URIReference<'uri> {
     /// reference.set_query(Some("myquery"));
     /// assert_eq!(reference.to_string(), "http://example.com/?myquery");
     /// ```
-    pub fn set_query<QueryType, QueryError>(
+    pub fn set_query<TQuery, TQueryError>(
         &mut self,
-        query: Option<QueryType>,
-    ) -> Result<Option<&Query<'uri>>, InvalidURIReference>
+        query: Option<TQuery>,
+    ) -> Result<Option<&Query<'uri>>, URIReferenceError>
     where
-        Query<'uri>: TryFrom<QueryType, Error = QueryError>,
-        InvalidURIReference: From<QueryError>,
+        Query<'uri>: TryFrom<TQuery, Error = TQueryError>,
+        URIReferenceError: From<TQueryError>,
     {
         self.query = match query {
             Some(query) => Some(Query::try_from(query)?),
@@ -1015,13 +1015,13 @@ impl<'uri> URIReference<'uri> {
     /// reference.set_scheme(Some("https"));
     /// assert_eq!(reference.to_string(), "https://example.com/");
     /// ```
-    pub fn set_scheme<SchemeType, SchemeError>(
+    pub fn set_scheme<TScheme, TSchemeError>(
         &mut self,
-        scheme: Option<SchemeType>,
-    ) -> Result<Option<&Scheme<'uri>>, InvalidURIReference>
+        scheme: Option<TScheme>,
+    ) -> Result<Option<&Scheme<'uri>>, URIReferenceError>
     where
-        Scheme<'uri>: TryFrom<SchemeType, Error = SchemeError>,
-        InvalidURIReference: From<SchemeError>,
+        Scheme<'uri>: TryFrom<TScheme, Error = TSchemeError>,
+        URIReferenceError: From<TSchemeError>,
     {
         self.scheme = match scheme {
             Some(scheme) => Some(Scheme::try_from(scheme)?),
@@ -1089,7 +1089,7 @@ impl<'uri> From<URIReference<'uri>> for String {
 }
 
 impl<'uri> TryFrom<&'uri [u8]> for URIReference<'uri> {
-    type Error = InvalidURIReference;
+    type Error = URIReferenceError;
 
     fn try_from(value: &'uri [u8]) -> Result<Self, Self::Error> {
         let (scheme, value) = match parse_scheme(value) {
@@ -1141,7 +1141,7 @@ impl<'uri> TryFrom<&'uri [u8]> for URIReference<'uri> {
 }
 
 impl<'uri> TryFrom<&'uri str> for URIReference<'uri> {
-    type Error = InvalidURIReference;
+    type Error = URIReferenceError;
 
     fn try_from(value: &'uri str) -> Result<Self, Self::Error> {
         URIReference::try_from(value.as_bytes())
@@ -1229,10 +1229,10 @@ impl<'uri> URIReferenceBuilder<'uri> {
     ///     .build();
     /// assert!(result.is_err());
     /// ```
-    pub fn build(self) -> Result<URIReference<'uri>, InvalidURIReference> {
+    pub fn build(self) -> Result<URIReference<'uri>, URIReferenceError> {
         let path = match self.path {
             Some(path) => path,
-            None => return Err(InvalidURIReference::MissingPath),
+            None => return Err(URIReferenceError::MissingPath),
         };
 
         URIReference::from_parts(self.scheme, self.authority, path, self.query, self.fragment)
@@ -1357,13 +1357,13 @@ impl<'uri> URIReferenceBuilder<'uri> {
     /// let reference = builder.build().unwrap();
     /// assert_eq!(reference.to_string(), "//example.com/my/path");
     /// ```
-    pub fn try_authority<AuthorityType, AuthorityError>(
+    pub fn try_authority<TAuthority, TAuthorityError>(
         &mut self,
-        authority: Option<AuthorityType>,
-    ) -> Result<&mut Self, InvalidAuthority>
+        authority: Option<TAuthority>,
+    ) -> Result<&mut Self, TAuthorityError>
     where
-        Authority<'uri>: TryFrom<AuthorityType, Error = AuthorityError>,
-        InvalidAuthority: From<AuthorityError>,
+        Authority<'uri>: TryFrom<TAuthority, Error = TAuthorityError>,
+        AuthorityError: From<TAuthorityError>,
     {
         self.authority = match authority {
             Some(authority) => Some(Authority::try_from(authority).map_err(|error| error)?),
@@ -1393,13 +1393,13 @@ impl<'uri> URIReferenceBuilder<'uri> {
     /// let reference = builder.build().unwrap();
     /// assert_eq!(reference.to_string(), "/my/path#fragment");
     /// ```
-    pub fn try_fragment<FragmentType, FragmentError>(
+    pub fn try_fragment<TFragment, TFragmentError>(
         &mut self,
-        fragment: Option<FragmentType>,
-    ) -> Result<&mut Self, InvalidFragment>
+        fragment: Option<TFragment>,
+    ) -> Result<&mut Self, FragmentError>
     where
-        Fragment<'uri>: TryFrom<FragmentType, Error = FragmentError>,
-        InvalidFragment: From<FragmentError>,
+        Fragment<'uri>: TryFrom<TFragment, Error = TFragmentError>,
+        FragmentError: From<TFragmentError>,
     {
         self.fragment = match fragment {
             Some(fragment) => Some(Fragment::try_from(fragment).map_err(|error| error)?),
@@ -1427,13 +1427,10 @@ impl<'uri> URIReferenceBuilder<'uri> {
     /// let reference = builder.build().unwrap();
     /// assert_eq!(reference.to_string(), "/my/path");
     /// ```
-    pub fn try_path<PathType, PathError>(
-        &mut self,
-        path: PathType,
-    ) -> Result<&mut Self, InvalidPath>
+    pub fn try_path<TPath, TPathError>(&mut self, path: TPath) -> Result<&mut Self, PathError>
     where
-        Path<'uri>: TryFrom<PathType, Error = PathError>,
-        InvalidPath: From<PathError>,
+        Path<'uri>: TryFrom<TPath, Error = TPathError>,
+        PathError: From<TPathError>,
     {
         self.path = Some(Path::try_from(path).map_err(|error| error)?);
         Ok(self)
@@ -1459,13 +1456,13 @@ impl<'uri> URIReferenceBuilder<'uri> {
     /// let reference = builder.build().unwrap();
     /// assert_eq!(reference.to_string(), "/my/path?query");
     /// ```
-    pub fn try_query<QueryType, QueryError>(
+    pub fn try_query<TQuery, TQueryError>(
         &mut self,
-        query: Option<QueryType>,
-    ) -> Result<&mut Self, InvalidQuery>
+        query: Option<TQuery>,
+    ) -> Result<&mut Self, QueryError>
     where
-        Query<'uri>: TryFrom<QueryType, Error = QueryError>,
-        InvalidQuery: From<QueryError>,
+        Query<'uri>: TryFrom<TQuery, Error = TQueryError>,
+        QueryError: From<TQueryError>,
     {
         self.query = match query {
             Some(query) => Some(Query::try_from(query).map_err(|error| error)?),
@@ -1494,13 +1491,13 @@ impl<'uri> URIReferenceBuilder<'uri> {
     /// let uri = builder.build().unwrap();
     /// assert_eq!(uri.to_string(), "urn:path");
     /// ```
-    pub fn try_scheme<SchemeType, SchemeError>(
+    pub fn try_scheme<TScheme, TSchemeError>(
         &mut self,
-        scheme: Option<SchemeType>,
-    ) -> Result<&mut Self, InvalidScheme>
+        scheme: Option<TScheme>,
+    ) -> Result<&mut Self, SchemeError>
     where
-        Scheme<'uri>: TryFrom<SchemeType, Error = SchemeError>,
-        InvalidScheme: From<SchemeError>,
+        Scheme<'uri>: TryFrom<TScheme, Error = TSchemeError>,
+        SchemeError: From<TSchemeError>,
     {
         self.scheme = match scheme {
             Some(scheme) => Some(Scheme::try_from(scheme).map_err(|error| error)?),
@@ -1629,107 +1626,107 @@ impl<'uri> URIReferenceBuilder<'uri> {
 /// An error representing an invalid URI reference.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
-pub enum InvalidURIReference {
+pub enum URIReferenceError {
     /// Represents the case when there is no authority, but the first path segment starts with
     /// `"//"`. This is not allowed because it would be interpreted as an authority component.
     ///
     /// This can only occur when using creation functions that act on individual parts (e.g.
     /// [`URIReference::from_parts`]).
-    AbsolutePathCannotStartWithTwoSlashes,
+    AbsolutePathStartsWithTwoSlashes,
 
     /// The authority component of the relative reference was invalid.
-    InvalidAuthority(InvalidAuthority),
+    Authority(AuthorityError),
 
     /// The fragment component of the relative reference was invalid.
-    InvalidFragment(InvalidFragment),
-
-    /// The path component of the relative reference was invalid.
-    InvalidPath(InvalidPath),
-
-    /// The query component of the relative reference was invalid.
-    InvalidQuery(InvalidQuery),
-
-    /// The scheme component of the relative reference was invalid.
-    InvalidScheme(InvalidScheme),
+    Fragment(FragmentError),
 
     /// This error occurs when you do not specify a path component on the builder.
     ///
     /// This can only occur when using [`URIReferenceBuilder`].
     MissingPath,
 
+    /// The path component of the relative reference was invalid.
+    Path(PathError),
+
+    /// The query component of the relative reference was invalid.
+    Query(QueryError),
+
+    /// The scheme component of the relative reference was invalid.
+    Scheme(SchemeError),
+
     /// Represents the case when there is no authority, but the first path segment starts with
     /// `"//"`. This is not allowed because it would be interpreted as an authority component.
     ///
     /// This can only occur when using creation functions that act on individual parts (e.g.
     /// [`URIReference::from_parts`]).
-    SchemelessPathCannotStartWithColonSegment,
+    SchemelessPathStartsWithColonSegment,
 }
 
-impl Display for InvalidURIReference {
+impl Display for URIReferenceError {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        formatter.write_str(self.description())
-    }
-}
-
-impl Error for InvalidURIReference {
-    fn description(&self) -> &str {
-        use self::InvalidURIReference::*;
+        use self::URIReferenceError::*;
 
         match self {
-            AbsolutePathCannotStartWithTwoSlashes => "absolute path cannot start with two slashes",
-            InvalidAuthority(invalid_authority) => invalid_authority.description(),
-            InvalidFragment(invalid_fragment) => invalid_fragment.description(),
-            InvalidPath(invalid_path) => invalid_path.description(),
-            InvalidQuery(invalid_query) => invalid_query.description(),
-            InvalidScheme(invalid_scheme) => invalid_scheme.description(),
-            MissingPath => "missing path",
-            SchemelessPathCannotStartWithColonSegment => {
-                "schemeless path cannot start with colon segment"
-            }
+            AbsolutePathStartsWithTwoSlashes => write!(
+                formatter,
+                "absolute path URI reference starts with two slashes"
+            ),
+            Authority(error) => error.fmt(formatter),
+            Fragment(error) => error.fmt(formatter),
+            Path(error) => error.fmt(formatter),
+            Query(error) => error.fmt(formatter),
+            Scheme(error) => error.fmt(formatter),
+            MissingPath => write!(formatter, "URI reference missing path"),
+            SchemelessPathStartsWithColonSegment => write!(
+                formatter,
+                "schemeless path URI reference starts with colon segment"
+            ),
         }
     }
 }
 
-impl From<Infallible> for InvalidURIReference {
+impl Error for URIReferenceError {}
+
+impl From<Infallible> for URIReferenceError {
     fn from(_: Infallible) -> Self {
-        InvalidURIReference::AbsolutePathCannotStartWithTwoSlashes
+        URIReferenceError::AbsolutePathStartsWithTwoSlashes
     }
 }
 
-impl From<InvalidAuthority> for InvalidURIReference {
-    fn from(value: InvalidAuthority) -> Self {
-        InvalidURIReference::InvalidAuthority(value)
+impl From<AuthorityError> for URIReferenceError {
+    fn from(value: AuthorityError) -> Self {
+        URIReferenceError::Authority(value)
     }
 }
 
-impl From<InvalidFragment> for InvalidURIReference {
-    fn from(value: InvalidFragment) -> Self {
-        InvalidURIReference::InvalidFragment(value)
+impl From<FragmentError> for URIReferenceError {
+    fn from(value: FragmentError) -> Self {
+        URIReferenceError::Fragment(value)
     }
 }
 
-impl From<InvalidPath> for InvalidURIReference {
-    fn from(value: InvalidPath) -> Self {
-        InvalidURIReference::InvalidPath(value)
+impl From<PathError> for URIReferenceError {
+    fn from(value: PathError) -> Self {
+        URIReferenceError::Path(value)
     }
 }
 
-impl From<InvalidQuery> for InvalidURIReference {
-    fn from(value: InvalidQuery) -> Self {
-        InvalidURIReference::InvalidQuery(value)
+impl From<QueryError> for URIReferenceError {
+    fn from(value: QueryError) -> Self {
+        URIReferenceError::Query(value)
     }
 }
 
-impl From<InvalidScheme> for InvalidURIReference {
-    fn from(value: InvalidScheme) -> Self {
-        InvalidURIReference::InvalidScheme(value)
+impl From<SchemeError> for URIReferenceError {
+    fn from(value: SchemeError) -> Self {
+        URIReferenceError::Scheme(value)
     }
 }
 
 fn validate_absolute_path(
     authority: Option<&Authority>,
     path: &Path,
-) -> Result<(), InvalidURIReference> {
+) -> Result<(), URIReferenceError> {
     if authority.is_some()
         || path.is_relative()
         || path.segments().len() == 1
@@ -1737,7 +1734,7 @@ fn validate_absolute_path(
     {
         Ok(())
     } else {
-        Err(InvalidURIReference::AbsolutePathCannotStartWithTwoSlashes)
+        Err(URIReferenceError::AbsolutePathStartsWithTwoSlashes)
     }
 }
 
@@ -1745,7 +1742,7 @@ fn validate_schemeless_path(
     scheme: Option<&Scheme>,
     authority: Option<&Authority>,
     path: &Path,
-) -> Result<(), InvalidURIReference> {
+) -> Result<(), URIReferenceError> {
     if scheme.is_some()
         || authority.is_some()
         || !path
@@ -1757,7 +1754,7 @@ fn validate_schemeless_path(
     {
         Ok(())
     } else {
-        Err(InvalidURIReference::SchemelessPathCannotStartWithColonSegment)
+        Err(URIReferenceError::SchemelessPathStartsWithColonSegment)
     }
 }
 

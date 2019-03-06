@@ -12,15 +12,15 @@ pub mod uri;
 pub mod uri_reference;
 
 pub use self::authority::{
-    Authority, Host, InvalidAuthority, InvalidHost, InvalidPort, InvalidRegisteredName,
-    InvalidUserInfo, Password, RegisteredName, Username,
+    Authority, AuthorityError, Host, HostError, Password, PasswordError, PortError, RegisteredName,
+    RegisteredNameError, Username, UsernameError,
 };
-pub use self::fragment::{Fragment, InvalidFragment};
-pub use self::path::{InvalidPath, Path, Segment};
-pub use self::query::{InvalidQuery, Query};
+pub use self::fragment::{Fragment, FragmentError};
+pub use self::path::{Path, PathError, Segment};
+pub use self::query::{Query, QueryError};
 pub use self::relative_reference::{
-    InvalidRelativeReference, RelativeReference, RelativeReferenceBuilder,
+    RelativeReference, RelativeReferenceBuilder, RelativeReferenceError,
 };
-pub use self::scheme::{InvalidScheme, Scheme, SchemeStatus, UnregisteredScheme};
-pub use self::uri::{InvalidURI, URIBuilder, URI};
-pub use self::uri_reference::{InvalidURIReference, URIReference, URIReferenceBuilder};
+pub use self::scheme::{Scheme, SchemeError, SchemeStatus, UnregisteredScheme};
+pub use self::uri::{URIBuilder, URIError, URI};
+pub use self::uri_reference::{URIReference, URIReferenceBuilder, URIReferenceError};
