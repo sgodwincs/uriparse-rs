@@ -1,3 +1,8 @@
+# 0.6.0
+
+ - Rename errors and no longer directly implement `Error::description` (use `Display` instead).
+ - Refactor builders to use a `method`, `try_method`, and `with_method` approach.
+
 # 0.5.0
  
  - Add new schemes:
