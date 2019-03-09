@@ -573,7 +573,7 @@ impl Display for SchemeError {
         match self {
             Empty => write!(formatter, "scheme is empty"),
             InvalidCharacter => write!(formatter, "invalid scheme character"),
-            MustStartWithAlphabetic => {
+            StartsWithNonAlphabetic => {
                 write!(formatter, "scheme starts with non-alphabetic character")
             }
         }
