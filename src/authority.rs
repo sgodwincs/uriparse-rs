@@ -135,14 +135,8 @@ impl<'authority> Authority<'authority> {
             Host::IPv4Address(ipv4) => Host::IPv4Address(*ipv4),
             Host::IPv6Address(ipv6) => Host::IPv6Address(*ipv6),
         };
-        let password = self
-            .password
-            .as_ref()
-            .map(|password| password.as_borrowed());
-        let username = self
-            .username
-            .as_ref()
-            .map(|username| username.as_borrowed());
+        let password = self.password.as_ref().map(Password::as_borrowed);
+        let username = self.username.as_ref().map(Username::as_borrowed);
 
         Authority {
             host,
@@ -299,8 +293,8 @@ impl<'authority> Authority<'authority> {
     /// This is different from just cloning. Cloning the authority will just copy the eferences, and
     /// thus the lifetime will remain the same.
     pub fn into_owned(self) -> Authority<'static> {
-        let password = self.password.map(|password| password.into_owned());
-        let username = self.username.map(|username| username.into_owned());
+        let password = self.password.map(Password::into_owned);
+        let username = self.username.map(Username::into_owned);
         let host = match self.host {
             Host::RegisteredName(name) => Host::RegisteredName(name.into_owned()),
             Host::IPv4Address(ipv4) => Host::IPv4Address(ipv4),

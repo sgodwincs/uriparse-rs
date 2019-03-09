@@ -405,11 +405,11 @@ impl<'uri> URIReference<'uri> {
     /// This is different from just cloning. Cloning the URI reference will just copy the
     /// references, and thus the lifetime will remain the same.
     pub fn into_owned(self) -> URIReference<'static> {
-        let scheme = self.scheme.map(|scheme| scheme.into_owned());
-        let authority = self.authority.map(|authority| authority.into_owned());
+        let scheme = self.scheme.map(Scheme::into_owned);
+        let authority = self.authority.map(Authority::into_owned);
         let path = self.path.into_owned();
-        let query = self.query.map(|query| query.into_owned());
-        let fragment = self.fragment.map(|fragment| fragment.into_owned());
+        let query = self.query.map(Query::into_owned);
+        let fragment = self.fragment.map(Fragment::into_owned);
 
         URIReference {
             authority,

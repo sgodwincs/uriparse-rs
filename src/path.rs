@@ -108,7 +108,7 @@ impl<'path> Path<'path> {
         let segments = self
             .segments
             .into_iter()
-            .map(|segment| segment.into_owned())
+            .map(Segment::into_owned)
             .collect::<Vec<Segment<'static>>>();
 
         Path {
@@ -560,11 +560,7 @@ impl<'path> Path<'path> {
     ///
     /// This function will perform a memory allocation.
     pub fn to_borrowed(&self) -> Path {
-        let segments = self
-            .segments
-            .iter()
-            .map(|segment| segment.as_borrowed())
-            .collect();
+        let segments = self.segments.iter().map(Segment::as_borrowed).collect();
 
         Path {
             absolute: self.absolute,
