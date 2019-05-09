@@ -8,7 +8,7 @@ license = "MIT"
 name = "uriparse"
 readme = "README.md"
 repository = "https://github.com/sgodwincs/uriparse-rs"
-version = "0.6.0"
+version = "0.6.1"
 
 [[bench]]
 harness = false
