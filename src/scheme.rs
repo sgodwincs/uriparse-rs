@@ -23,7 +23,7 @@ use crate::utility::normalize_string;
 const MAX_REGISTERED_SCHEME_LENGTH: usize = 36;
 
 /// The number of registered schemes. Make sure to update this whenever adding a new scheme.
-const NUMBER_OF_SCHEMES: usize = 291;
+const NUMBER_OF_SCHEMES: usize = 304;
 
 /// A map of byte characters that determines if a character is a valid scheme character.
 #[rustfmt::skip]
@@ -704,6 +704,8 @@ schemes! {
     (AFP, "afp", SchemeStatus::Provisional);
     (AFS, "afs", SchemeStatus::Provisional);
     (AIM, "aim", SchemeStatus::Provisional);
+    (AMSS, "amss", SchemeStatus::Provisional);
+    (Android, "android", SchemeStatus::Provisional);
     (AppData, "appdata", SchemeStatus::Provisional);
     (APT, "apt", SchemeStatus::Provisional);
     (Attachment, "attachment", SchemeStatus::Provisional);
@@ -718,6 +720,8 @@ schemes! {
     (Calculator, "calculator", SchemeStatus::Provisional);
     (CallTo, "callto", SchemeStatus::Provisional);
     (CAP, "cap", SchemeStatus::Permanent);
+    (Cast, "cast", SchemeStatus::Provisional);
+    (Casts, "casts", SchemeStatus::Provisional);
     (Chrome, "chrome", SchemeStatus::Provisional);
     (ChromeExtension, "chrome-extension", SchemeStatus::Provisional);
     (CID, "cid", SchemeStatus::Permanent);
@@ -732,6 +736,7 @@ schemes! {
     (Conti, "conti", SchemeStatus::Provisional);
     (CRID, "crid", SchemeStatus::Permanent);
     (CVS, "cvs", SchemeStatus::Provisional);
+    (DAB, "dab", SchemeStatus::Provisional);
     (Data, "data", SchemeStatus::Permanent);
     (DAV, "dav", SchemeStatus::Permanent);
     (Diaspora, "diaspora", SchemeStatus::Provisional);
@@ -743,6 +748,8 @@ schemes! {
     (DNS, "dns", SchemeStatus::Permanent);
     (DNTP, "dntp", SchemeStatus::Provisional);
     (DPP, "dpp", SchemeStatus::Provisional);
+    (DRM, "drm", SchemeStatus::Provisional);
+    (Drop, "drop", SchemeStatus::Provisional);
     (DTN, "dtn", SchemeStatus::Provisional);
     (DVB, "dvb", SchemeStatus::Provisional);
     (ED2K, "ed2k", SchemeStatus::Provisional);
@@ -756,7 +763,9 @@ schemes! {
     (FileSystem, "filesystem", SchemeStatus::Historical);
     (Finger, "finger", SchemeStatus::Provisional);
     (Fish, "fish", SchemeStatus::Provisional);
+    (FM, "fm", SchemeStatus::Provisional);
     (FTP, "ftp", SchemeStatus::Permanent);
+    (FuchsiaPkg, "fuchsia-pkg", SchemeStatus::Provisional);
     (Geo, "geo", SchemeStatus::Permanent);
     (GG, "gg", SchemeStatus::Provisional);
     (Git, "git", SchemeStatus::Provisional);
@@ -801,6 +810,7 @@ schemes! {
     (LastFM, "lastfm", SchemeStatus::Provisional);
     (LDAP, "ldap", SchemeStatus::Permanent);
     (LDAPS, "ldaps", SchemeStatus::Provisional);
+    (LoRaWAN, "lorawan", SchemeStatus::Provisional);
     (LVLT, "lvlt", SchemeStatus::Provisional);
     (Magnet, "magnet", SchemeStatus::Provisional);
     (MailServer, "mailserver", SchemeStatus::Historical);
