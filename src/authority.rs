@@ -794,6 +794,24 @@ impl Host<'_> {
         }
     }
 
+    /// Converts the [`Host`] into an owned copy.
+    ///
+    /// If you construct the host from a source with a non-static lifetime, you may run into
+    /// lifetime problems due to the way the struct is designed. Calling this function will ensure
+    /// that the returned value has a static lifetime.
+    ///
+    /// This is different from just cloning. Cloning the host will just copy the references, and
+    /// thus the lifetime will remain the same.
+    pub fn into_owned(self) -> Host<'static> {
+        use self::Host::*;
+
+        match self {
+            IPv4Address(ipv4) => IPv4Address(ipv4),
+            IPv6Address(ipv6) => IPv6Address(ipv6),
+            RegisteredName(name) => RegisteredName(name.into_owned()),
+        }
+    }
+
     /// Returns whether the host is an IPv4 address.
     ///
     /// # Examples
@@ -2196,7 +2214,7 @@ pub(crate) fn parse_authority(value: &[u8]) -> Result<(Authority, &[u8]), Author
 }
 
 /// Parses the port from the given byte string.
-fn parse_port(value: &[u8]) -> Result<Option<u16>, PortError> {
+pub fn parse_port(value: &[u8]) -> Result<Option<u16>, PortError> {
     if value.is_empty() {
         Ok(None)
     } else {
