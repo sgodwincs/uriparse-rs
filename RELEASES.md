@@ -1,3 +1,21 @@
+# 0.6.1
+
+ - Add new schemes:
+   * amss
+   * android
+   * cast
+   * casts
+   * dab
+   * drm
+   * drop
+   * fm
+   * fuchsia-pkg
+   * lorawan
+ - Add `Host::into_owned` to avoid having to match against `RegisteredName` to convert it into an
+   owned copy.
+ - Expose `parse_port` to parse port from byte slice. This is useful since `parse::<u16>()` can only
+   be used for strings, not byte slices.
+
 # 0.6.0
 
  - Rename errors and no longer directly implement `Error::description` (use `Display` instead).
