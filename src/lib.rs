@@ -1,5 +1,3 @@
-#![feature(non_exhaustive)]
-
 mod utility;
 
 pub mod authority;
