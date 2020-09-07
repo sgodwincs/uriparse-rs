@@ -1,3 +1,7 @@
+# 0.6.2
+
+ - Remove `non_exhaustive` nightly feature as it's now stable. Crate now works on stable.
+
 # 0.6.1
 
  - Add new schemes:
