@@ -27,6 +27,7 @@ use crate::uri_reference::{URIReference, URIReferenceBuilder, URIReferenceError}
 ///
 /// A URI is a URI reference, one with a scheme.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct URI<'uri> {
     /// All URIs are also URI references, so we just maintain a [`URIReference`] underneath.
     uri_reference: URIReference<'uri>,
@@ -1594,5 +1595,22 @@ mod test {
         test_case("g#s/./x", "http://a/b/c/g#s/./x");
         test_case("g#s/../x", "http://a/b/c/g#s/../x");
         test_case("http:g", "http:g");
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serde() {
+        let uri = URI::try_from("http://a/b/c/d;p?q").unwrap();
+
+        // Perform serialization
+        let json_string = serde_json::to_string(&uri).unwrap();
+
+        // Perform deserialization
+        let uri2 = serde_json::from_str(&json_string).unwrap();
+
+        assert_eq!(
+            uri, uri2,
+            "Information lost in serialization/deserialization"
+        );
     }
 }

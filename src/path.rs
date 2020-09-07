@@ -55,6 +55,7 @@ const PATH_CHAR_MAP: [u8; 256] = [
 /// normalized, use either the [`Path::normalize`] or [`Segment::normalize`] functions,
 /// respectively.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Path<'path> {
     /// whether the path is absolute. Specifically, a path is absolute if it starts with a
     /// `'/'`.
@@ -707,6 +708,7 @@ impl<'path> TryFrom<&'path str> for Path<'path> {
 ///
 /// Segments are separated from other segments with the `'/'` delimiter.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Segment<'segment> {
     /// Whether the segment is normalized.
     normalized: bool,

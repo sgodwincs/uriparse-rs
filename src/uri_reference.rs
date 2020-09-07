@@ -14,6 +14,7 @@ use crate::scheme::{parse_scheme, Scheme, SchemeError};
 ///
 /// Specifically, a URI reference is either a URI or a relative reference (a schemeless URI).
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct URIReference<'uri> {
     /// The authority component of the URI reference as defined in
     /// [[RFC3986, Section 3.2]](https://tools.ietf.org/html/rfc3986#section-3.2).

@@ -48,6 +48,7 @@ const FRAGMENT_CHAR_MAP: [u8; 256] = [
 /// mean that the fragment is normalized. If the fragment needs to be normalized, use the
 /// [`Fragment::normalize`] function.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Fragment<'fragment> {
     /// The internal fragment source that is either owned or borrowed.
     fragment: Cow<'fragment, str>,

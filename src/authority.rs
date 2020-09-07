@@ -110,6 +110,7 @@ const USER_INFO_CHAR_MAP: [u8; 256] = [
 /// Any conversions to a string will **not** hide the password component of the authority. Be
 /// careful if you decide to perform logging.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Authority<'authority> {
     /// The host component of the authority as defined in
     /// [[RFC3986, Section 3.2.2](https://tools.ietf.org/html/rfc3986#section-3.2.2)].
@@ -764,6 +765,7 @@ impl<'authority> TryFrom<&'authority str> for Authority<'authority> {
 /// mean that the host is normalized. If the host needs to be normalized, use the
 /// [`Host::normalize`] function.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Host<'host> {
     /// An IPv4 address. Based on the `std`'s implementation, leading zeros for octets are allowed
     /// for up to three digits. So for example, `"000.000.000.000"` is still considered a valid IPv4
@@ -1065,6 +1067,7 @@ impl<'host> TryFrom<&'host str> for Host<'host> {
 /// mean that the password is normalized. If the password needs to be normalized, use the
 /// [`Password::normalize`] function.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Password<'password> {
     /// Whether the password is normalized.
     normalized: bool,
@@ -1309,6 +1312,7 @@ impl<'password> TryFrom<&'password str> for Password<'password> {
 /// mean that the host is normalized. If the registered name needs to be normalized, use the
 /// [`RegisteredName::normalize`] function.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RegisteredName<'name> {
     /// Whether the registered name is normalized.
     normalized: bool,
@@ -1549,6 +1553,7 @@ impl<'name> TryFrom<&'name str> for RegisteredName<'name> {
 /// mean that the username is normalized. If the username needs to be normalized, use the
 /// [`Username::normalize`] function.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Username<'username> {
     /// Whether the username is normalized.
     normalized: bool,
