@@ -52,6 +52,7 @@ const QUERY_CHAR_MAP: [u8; 256] = [
 /// mean that the query is normalized. If the query needs to be normalized, use the
 /// [`Query::normalize`] function.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Query<'query> {
     /// Whether the query is normalized.
     normalized: bool,
