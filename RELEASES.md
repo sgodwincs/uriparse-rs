@@ -1,3 +1,7 @@
+# 0.6.3
+
+ - Add serde support behind feature - @chipsenkbeil.
+
 # 0.6.2
 
  - Remove `non_exhaustive` nightly feature as it's now stable. Crate now works on stable.
