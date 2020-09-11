@@ -80,6 +80,7 @@ macro_rules! schemes {
         /// An unregistered scheme is case-insensitive. Furthermore, percent-encoding is not allowed
         /// in schemes.
         #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+        #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
         #[non_exhaustive]
         pub enum Scheme<'scheme> {
         $(
@@ -359,6 +360,7 @@ impl<'scheme> TryFrom<&'scheme str> for Scheme<'scheme> {
 ///
 /// This is case-insensitive, and this is reflected in the equality and hash functions.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UnregisteredScheme<'scheme> {
     /// Whether the fragment is normalized.
     normalized: bool,
