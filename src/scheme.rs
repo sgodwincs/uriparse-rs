@@ -909,7 +909,7 @@ schemes! {
     (Pack, "pack", SchemeStatus::Historical);
     (Palm, "palm", SchemeStatus::Provisional);
     (Paparazzi, "paparazzi", SchemeStatus::Provisional);
-    (PKCKS11, "pkcs11", SchemeStatus::Permanent);
+    (PKCS11, "pkcs11", SchemeStatus::Permanent);
     (Platform, "platform", SchemeStatus::Provisional);
     (POP, "pop", SchemeStatus::Permanent);
     (Pres, "pres", SchemeStatus::Permanent);
