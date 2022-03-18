@@ -2114,7 +2114,7 @@ fn check_ipv4_or_registered_name(value: &[u8]) -> (bool, bool) {
 /// Returns true if the byte string contains only valid IPv6 characters.
 fn check_ipv6(value: &[u8]) -> bool {
     for &byte in value {
-        if !byte.is_ascii_hexdigit() && byte != b':' {
+        if !byte.is_ascii_hexdigit() && byte != b':' && byte != b'.' {
             return false;
         }
     }
