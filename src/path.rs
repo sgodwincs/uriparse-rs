@@ -54,7 +54,7 @@ const PATH_CHAR_MAP: [u8; 256] = [
 /// mean that either the path or a given segment is normalized. If the path or a segment needs to be
 /// normalized, use either the [`Path::normalize`] or [`Segment::normalize`] functions,
 /// respectively.
-#[derive(Clone, Debug, Eq, Hash)]
+#[derive(Clone, Debug, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Path<'path> {
     /// whether the path is absolute. Specifically, a path is absolute if it starts with a
@@ -592,6 +592,15 @@ impl Display for Path<'_> {
     }
 }
 
+impl Hash for Path<'_> {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
+        self.segments.hash(state)
+    }
+}
+
 impl<'path> From<Path<'path>> for String {
     fn from(value: Path<'path>) -> Self {
         value.to_string()
@@ -600,11 +609,7 @@ impl<'path> From<Path<'path>> for String {
 
 impl PartialEq for Path<'_> {
     fn eq(&self, other: &Path) -> bool {
-        self.absolute == other.absolute
-            && self.double_dot_segment_count == other.double_dot_segment_count
-            && self.leading_double_dot_segment_count == other.leading_double_dot_segment_count
-            && self.single_dot_segment_count == other.single_dot_segment_count
-            && self.segments == other.segments
+        self.segments == other.segments
     }
 }
 
