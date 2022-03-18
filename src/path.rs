@@ -54,7 +54,7 @@ const PATH_CHAR_MAP: [u8; 256] = [
 /// mean that either the path or a given segment is normalized. If the path or a segment needs to be
 /// normalized, use either the [`Path::normalize`] or [`Segment::normalize`] functions,
 /// respectively.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Path<'path> {
     /// whether the path is absolute. Specifically, a path is absolute if it starts with a
@@ -595,6 +595,16 @@ impl Display for Path<'_> {
 impl<'path> From<Path<'path>> for String {
     fn from(value: Path<'path>) -> Self {
         value.to_string()
+    }
+}
+
+impl PartialEq for Path<'_> {
+    fn eq(&self, other: &Path) -> bool {
+        self.absolute == other.absolute
+            && self.double_dot_segment_count == other.double_dot_segment_count
+            && self.leading_double_dot_segment_count == other.leading_double_dot_segment_count
+            && self.single_dot_segment_count == other.single_dot_segment_count
+            && self.segments == other.segments
     }
 }
 
@@ -1203,6 +1213,14 @@ pub(crate) fn parse_path(value: &[u8]) -> Result<(Path, &[u8]), PathError> {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn test_path_equals() {
+        assert_eq!(
+            Path::try_from("segment").unwrap(),
+            Path::try_from("s%65gment").unwrap()
+        );
+    }
 
     #[test]
     fn test_path_normalize() {
