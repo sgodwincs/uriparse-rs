@@ -207,7 +207,7 @@ impl Hash for Fragment<'_> {
 
 impl PartialEq for Fragment<'_> {
     fn eq(&self, other: &Fragment) -> bool {
-        percent_encoded_equality(self.fragment.as_bytes(), other.fragment.as_bytes(), true)
+        *self == *other.as_bytes()
     }
 }
 
@@ -219,43 +219,43 @@ impl PartialEq<[u8]> for Fragment<'_> {
 
 impl<'fragment> PartialEq<Fragment<'fragment>> for [u8] {
     fn eq(&self, other: &Fragment<'fragment>) -> bool {
-        percent_encoded_equality(self, other.fragment.as_bytes(), true)
+        other == self
     }
 }
 
 impl<'a> PartialEq<&'a [u8]> for Fragment<'_> {
     fn eq(&self, other: &&'a [u8]) -> bool {
-        percent_encoded_equality(self.fragment.as_bytes(), other, true)
+        self == *other
     }
 }
 
 impl<'a, 'fragment> PartialEq<Fragment<'fragment>> for &'a [u8] {
     fn eq(&self, other: &Fragment<'fragment>) -> bool {
-        percent_encoded_equality(self, other.fragment.as_bytes(), true)
+        other == *self
     }
 }
 
 impl PartialEq<str> for Fragment<'_> {
     fn eq(&self, other: &str) -> bool {
-        percent_encoded_equality(self.fragment.as_bytes(), other.as_bytes(), true)
+        self == other.as_bytes()
     }
 }
 
 impl<'fragment> PartialEq<Fragment<'fragment>> for str {
     fn eq(&self, other: &Fragment<'fragment>) -> bool {
-        percent_encoded_equality(self.as_bytes(), other.fragment.as_bytes(), true)
+        other == self.as_bytes()
     }
 }
 
 impl<'a> PartialEq<&'a str> for Fragment<'_> {
     fn eq(&self, other: &&'a str) -> bool {
-        percent_encoded_equality(self.fragment.as_bytes(), other.as_bytes(), true)
+        self == other.as_bytes()
     }
 }
 
 impl<'a, 'fragment> PartialEq<Fragment<'fragment>> for &'a str {
     fn eq(&self, other: &Fragment<'fragment>) -> bool {
-        percent_encoded_equality(self.as_bytes(), other.fragment.as_bytes(), true)
+        other == self.as_bytes()
     }
 }
 

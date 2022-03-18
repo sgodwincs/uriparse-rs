@@ -1226,7 +1226,7 @@ impl Hash for Password<'_> {
 
 impl PartialEq for Password<'_> {
     fn eq(&self, other: &Password) -> bool {
-        percent_encoded_equality(self.password.as_bytes(), other.password.as_bytes(), true)
+        *self == *other.as_bytes()
     }
 }
 
@@ -1238,43 +1238,43 @@ impl PartialEq<[u8]> for Password<'_> {
 
 impl<'password> PartialEq<Password<'password>> for [u8] {
     fn eq(&self, other: &Password<'password>) -> bool {
-        percent_encoded_equality(self, other.password.as_bytes(), true)
+        other == self
     }
 }
 
 impl<'a> PartialEq<&'a [u8]> for Password<'_> {
     fn eq(&self, other: &&'a [u8]) -> bool {
-        percent_encoded_equality(self.password.as_bytes(), other, true)
+        self == *other
     }
 }
 
 impl<'a, 'password> PartialEq<Password<'password>> for &'a [u8] {
     fn eq(&self, other: &Password<'password>) -> bool {
-        percent_encoded_equality(self, other.password.as_bytes(), true)
+        other == *self
     }
 }
 
 impl PartialEq<str> for Password<'_> {
     fn eq(&self, other: &str) -> bool {
-        percent_encoded_equality(self.password.as_bytes(), other.as_bytes(), true)
+        self == other.as_bytes()
     }
 }
 
 impl<'password> PartialEq<Password<'password>> for str {
     fn eq(&self, other: &Password<'password>) -> bool {
-        percent_encoded_equality(self.as_bytes(), other.password.as_bytes(), true)
+        other == self.as_bytes()
     }
 }
 
 impl<'a> PartialEq<&'a str> for Password<'_> {
     fn eq(&self, other: &&'a str) -> bool {
-        percent_encoded_equality(self.password.as_bytes(), other.as_bytes(), true)
+        self == other.as_bytes()
     }
 }
 
 impl<'a, 'password> PartialEq<Password<'password>> for &'a str {
     fn eq(&self, other: &Password<'password>) -> bool {
-        percent_encoded_equality(self.as_bytes(), other.password.as_bytes(), true)
+        other == self.as_bytes()
     }
 }
 
@@ -1442,6 +1442,14 @@ impl AsRef<str> for RegisteredName<'_> {
     }
 }
 
+impl Deref for RegisteredName<'_> {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.registered_name
+    }
+}
+
 impl Display for RegisteredName<'_> {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
         formatter.write_str(&self.registered_name)
@@ -1467,11 +1475,7 @@ impl Hash for RegisteredName<'_> {
 
 impl PartialEq for RegisteredName<'_> {
     fn eq(&self, other: &RegisteredName) -> bool {
-        percent_encoded_equality(
-            self.registered_name.as_bytes(),
-            other.registered_name.as_bytes(),
-            false,
-        )
+        *self == *other.as_bytes()
     }
 }
 
@@ -1483,43 +1487,43 @@ impl PartialEq<[u8]> for RegisteredName<'_> {
 
 impl<'name> PartialEq<RegisteredName<'name>> for [u8] {
     fn eq(&self, other: &RegisteredName<'name>) -> bool {
-        percent_encoded_equality(self, other.registered_name.as_bytes(), false)
+        other == self
     }
 }
 
 impl<'a> PartialEq<&'a [u8]> for RegisteredName<'_> {
     fn eq(&self, other: &&'a [u8]) -> bool {
-        percent_encoded_equality(self.registered_name.as_bytes(), other, false)
+        self == *other
     }
 }
 
 impl<'a, 'name> PartialEq<RegisteredName<'name>> for &'a [u8] {
     fn eq(&self, other: &RegisteredName<'name>) -> bool {
-        percent_encoded_equality(self, other.registered_name.as_bytes(), false)
+        other == *self
     }
 }
 
 impl PartialEq<str> for RegisteredName<'_> {
     fn eq(&self, other: &str) -> bool {
-        percent_encoded_equality(self.registered_name.as_bytes(), other.as_bytes(), false)
+        self == other.as_bytes()
     }
 }
 
 impl<'name> PartialEq<RegisteredName<'name>> for str {
     fn eq(&self, other: &RegisteredName<'name>) -> bool {
-        percent_encoded_equality(self.as_bytes(), other.registered_name.as_bytes(), false)
+        other == self.as_bytes()
     }
 }
 
 impl<'a> PartialEq<&'a str> for RegisteredName<'_> {
     fn eq(&self, other: &&'a str) -> bool {
-        percent_encoded_equality(self.registered_name.as_bytes(), other.as_bytes(), false)
+        self == other.as_bytes()
     }
 }
 
 impl<'a, 'name> PartialEq<RegisteredName<'name>> for &'a str {
     fn eq(&self, other: &RegisteredName<'name>) -> bool {
-        percent_encoded_equality(self.as_bytes(), other.registered_name.as_bytes(), false)
+        other == self.as_bytes()
     }
 }
 
@@ -1712,7 +1716,7 @@ impl Hash for Username<'_> {
 
 impl PartialEq for Username<'_> {
     fn eq(&self, other: &Username) -> bool {
-        percent_encoded_equality(self.username.as_bytes(), other.username.as_bytes(), true)
+        *self == *other.as_bytes()
     }
 }
 
@@ -1724,43 +1728,43 @@ impl PartialEq<[u8]> for Username<'_> {
 
 impl<'username> PartialEq<Username<'username>> for [u8] {
     fn eq(&self, other: &Username<'username>) -> bool {
-        percent_encoded_equality(self, other.as_bytes(), true)
+        other == self
     }
 }
 
 impl<'a> PartialEq<&'a [u8]> for Username<'_> {
     fn eq(&self, other: &&'a [u8]) -> bool {
-        percent_encoded_equality(self.username.as_bytes(), other, true)
+        self == *other
     }
 }
 
 impl<'a, 'username> PartialEq<Username<'username>> for &'a [u8] {
     fn eq(&self, other: &Username<'username>) -> bool {
-        percent_encoded_equality(self, other.as_bytes(), true)
+        other == *self
     }
 }
 
 impl PartialEq<str> for Username<'_> {
     fn eq(&self, other: &str) -> bool {
-        percent_encoded_equality(self.username.as_bytes(), other.as_bytes(), true)
+        self == other.as_bytes()
     }
 }
 
 impl<'username> PartialEq<Username<'username>> for str {
     fn eq(&self, other: &Username<'username>) -> bool {
-        percent_encoded_equality(self.as_bytes(), other.username.as_bytes(), true)
+        other == self.as_bytes()
     }
 }
 
 impl<'a> PartialEq<&'a str> for Username<'_> {
     fn eq(&self, other: &&'a str) -> bool {
-        percent_encoded_equality(self.username.as_bytes(), other.as_bytes(), true)
+        self == other.as_bytes()
     }
 }
 
 impl<'a, 'username> PartialEq<Username<'username>> for &'a str {
     fn eq(&self, other: &Username<'username>) -> bool {
-        percent_encoded_equality(self.as_bytes(), other.username.as_bytes(), true)
+        other == self.as_bytes()
     }
 }
 

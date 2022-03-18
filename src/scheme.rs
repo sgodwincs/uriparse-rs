@@ -309,27 +309,51 @@ impl<'scheme> From<Scheme<'scheme>> for String {
     }
 }
 
+impl PartialEq<[u8]> for Scheme<'_> {
+    fn eq(&self, other: &[u8]) -> bool {
+        self.as_str().as_bytes().eq_ignore_ascii_case(other)
+    }
+}
+
+impl<'scheme> PartialEq<Scheme<'scheme>> for [u8] {
+    fn eq(&self, other: &Scheme<'scheme>) -> bool {
+        other == self
+    }
+}
+
+impl<'a> PartialEq<&'a [u8]> for Scheme<'_> {
+    fn eq(&self, other: &&'a [u8]) -> bool {
+        self == *other
+    }
+}
+
+impl<'a, 'scheme> PartialEq<Scheme<'scheme>> for &'a [u8] {
+    fn eq(&self, other: &Scheme<'scheme>) -> bool {
+        other == *self
+    }
+}
+
 impl PartialEq<str> for Scheme<'_> {
     fn eq(&self, other: &str) -> bool {
-        self.as_str().eq_ignore_ascii_case(other)
+        self == other.as_bytes()
     }
 }
 
 impl<'scheme> PartialEq<Scheme<'scheme>> for str {
     fn eq(&self, other: &Scheme<'scheme>) -> bool {
-        self.eq_ignore_ascii_case(other.as_str())
+        other == self.as_bytes()
     }
 }
 
 impl<'a> PartialEq<&'a str> for Scheme<'_> {
     fn eq(&self, other: &&'a str) -> bool {
-        self.as_str().eq_ignore_ascii_case(other)
+        self == other.as_bytes()
     }
 }
 
 impl<'a, 'scheme> PartialEq<Scheme<'scheme>> for &'a str {
     fn eq(&self, other: &Scheme<'scheme>) -> bool {
-        self.eq_ignore_ascii_case(other.as_str())
+        other == self.as_bytes()
     }
 }
 
@@ -507,31 +531,55 @@ impl Hash for UnregisteredScheme<'_> {
 
 impl PartialEq for UnregisteredScheme<'_> {
     fn eq(&self, other: &UnregisteredScheme) -> bool {
-        self.scheme.eq_ignore_ascii_case(&other.scheme)
+        *self == *other.scheme.as_bytes()
+    }
+}
+
+impl PartialEq<[u8]> for UnregisteredScheme<'_> {
+    fn eq(&self, other: &[u8]) -> bool {
+        self.scheme.as_bytes().eq_ignore_ascii_case(&other)
+    }
+}
+
+impl<'scheme> PartialEq<UnregisteredScheme<'scheme>> for [u8] {
+    fn eq(&self, other: &UnregisteredScheme<'scheme>) -> bool {
+        other == self
+    }
+}
+
+impl<'a> PartialEq<&'a [u8]> for UnregisteredScheme<'_> {
+    fn eq(&self, other: &&'a [u8]) -> bool {
+        self == *other
+    }
+}
+
+impl<'a, 'scheme> PartialEq<UnregisteredScheme<'scheme>> for &'a [u8] {
+    fn eq(&self, other: &UnregisteredScheme<'scheme>) -> bool {
+        other == *self
     }
 }
 
 impl PartialEq<str> for UnregisteredScheme<'_> {
     fn eq(&self, other: &str) -> bool {
-        self.scheme.eq_ignore_ascii_case(other)
+        self == other.as_bytes()
     }
 }
 
 impl<'scheme> PartialEq<UnregisteredScheme<'scheme>> for str {
     fn eq(&self, other: &UnregisteredScheme<'scheme>) -> bool {
-        self.eq_ignore_ascii_case(&other.scheme)
+        other == self.as_bytes()
     }
 }
 
 impl<'a> PartialEq<&'a str> for UnregisteredScheme<'_> {
     fn eq(&self, other: &&'a str) -> bool {
-        self.scheme.eq_ignore_ascii_case(other)
+        self == other.as_bytes()
     }
 }
 
 impl<'a, 'scheme> PartialEq<UnregisteredScheme<'scheme>> for &'a str {
     fn eq(&self, other: &UnregisteredScheme<'scheme>) -> bool {
-        self.eq_ignore_ascii_case(&other.scheme)
+        other == self.as_bytes()
     }
 }
 

@@ -211,7 +211,7 @@ impl Hash for Query<'_> {
 
 impl PartialEq for Query<'_> {
     fn eq(&self, other: &Query) -> bool {
-        percent_encoded_equality(self.query.as_bytes(), other.query.as_bytes(), true)
+        *self == *other.as_bytes()
     }
 }
 
@@ -223,43 +223,43 @@ impl PartialEq<[u8]> for Query<'_> {
 
 impl<'query> PartialEq<Query<'query>> for [u8] {
     fn eq(&self, other: &Query<'query>) -> bool {
-        percent_encoded_equality(self, other.query.as_bytes(), true)
+        other == self
     }
 }
 
 impl<'a> PartialEq<&'a [u8]> for Query<'_> {
     fn eq(&self, other: &&'a [u8]) -> bool {
-        percent_encoded_equality(self.query.as_bytes(), other, true)
+        self == *other
     }
 }
 
 impl<'a, 'query> PartialEq<Query<'query>> for &'a [u8] {
     fn eq(&self, other: &Query<'query>) -> bool {
-        percent_encoded_equality(self, other.query.as_bytes(), true)
+        other == *self
     }
 }
 
 impl PartialEq<str> for Query<'_> {
     fn eq(&self, other: &str) -> bool {
-        percent_encoded_equality(self.query.as_bytes(), other.as_bytes(), true)
+        self == other.as_bytes()
     }
 }
 
 impl<'query> PartialEq<Query<'query>> for str {
     fn eq(&self, other: &Query<'query>) -> bool {
-        percent_encoded_equality(self.as_bytes(), other.query.as_bytes(), true)
+        other == self.as_bytes()
     }
 }
 
 impl<'a> PartialEq<&'a str> for Query<'_> {
     fn eq(&self, other: &&'a str) -> bool {
-        percent_encoded_equality(self.query.as_bytes(), other.as_bytes(), true)
+        self == other.as_bytes()
     }
 }
 
 impl<'a, 'query> PartialEq<Query<'query>> for &'a str {
     fn eq(&self, other: &Query<'query>) -> bool {
-        percent_encoded_equality(self.as_bytes(), other.query.as_bytes(), true)
+        other == self.as_bytes()
     }
 }
 

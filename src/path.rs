@@ -642,7 +642,7 @@ impl PartialEq<[u8]> for Path<'_> {
 
 impl<'path> PartialEq<Path<'path>> for [u8] {
     fn eq(&self, other: &Path<'path>) -> bool {
-        self == other
+        other == self
     }
 }
 
@@ -654,7 +654,7 @@ impl<'a> PartialEq<&'a [u8]> for Path<'_> {
 
 impl<'a, 'path> PartialEq<Path<'path>> for &'a [u8] {
     fn eq(&self, other: &Path<'path>) -> bool {
-        self == other
+        other == *self
     }
 }
 
@@ -666,7 +666,7 @@ impl PartialEq<str> for Path<'_> {
 
 impl<'path> PartialEq<Path<'path>> for str {
     fn eq(&self, other: &Path<'path>) -> bool {
-        self.as_bytes() == other
+        other == self.as_bytes()
     }
 }
 
@@ -678,7 +678,7 @@ impl<'a> PartialEq<&'a str> for Path<'_> {
 
 impl<'a, 'path> PartialEq<Path<'path>> for &'a str {
     fn eq(&self, other: &Path<'path>) -> bool {
-        self.as_bytes() == other
+        other == self.as_bytes()
     }
 }
 
@@ -947,7 +947,7 @@ impl Hash for Segment<'_> {
 
 impl PartialEq for Segment<'_> {
     fn eq(&self, other: &Segment) -> bool {
-        percent_encoded_equality(self.segment.as_bytes(), other.segment.as_bytes(), true)
+        *self == *other.as_bytes()
     }
 }
 
@@ -959,43 +959,43 @@ impl PartialEq<[u8]> for Segment<'_> {
 
 impl<'segment> PartialEq<Segment<'segment>> for [u8] {
     fn eq(&self, other: &Segment<'segment>) -> bool {
-        percent_encoded_equality(self, other.segment.as_bytes(), true)
+        other == self
     }
 }
 
 impl<'a> PartialEq<&'a [u8]> for Segment<'_> {
     fn eq(&self, other: &&'a [u8]) -> bool {
-        percent_encoded_equality(self.segment.as_bytes(), other, true)
+        self == *other
     }
 }
 
 impl<'a, 'segment> PartialEq<Segment<'segment>> for &'a [u8] {
     fn eq(&self, other: &Segment<'segment>) -> bool {
-        percent_encoded_equality(self, other.segment.as_bytes(), true)
+        other == *self
     }
 }
 
 impl PartialEq<str> for Segment<'_> {
     fn eq(&self, other: &str) -> bool {
-        percent_encoded_equality(self.segment.as_bytes(), other.as_bytes(), true)
+        self == other.as_bytes()
     }
 }
 
 impl<'segment> PartialEq<Segment<'segment>> for str {
     fn eq(&self, other: &Segment<'segment>) -> bool {
-        percent_encoded_equality(self.as_bytes(), other.segment.as_bytes(), true)
+        other == self.as_bytes()
     }
 }
 
 impl<'a> PartialEq<&'a str> for Segment<'_> {
     fn eq(&self, other: &&'a str) -> bool {
-        percent_encoded_equality(self.segment.as_bytes(), other.as_bytes(), true)
+        self == other.as_bytes()
     }
 }
 
 impl<'a, 'segment> PartialEq<Segment<'segment>> for &'a str {
     fn eq(&self, other: &Segment<'segment>) -> bool {
-        percent_encoded_equality(self.as_bytes(), other.segment.as_bytes(), true)
+        other == self.as_bytes()
     }
 }
 
