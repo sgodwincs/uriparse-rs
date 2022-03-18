@@ -1118,6 +1118,8 @@ impl<'uri> TryFrom<&'uri [u8]> for URIReference<'uri> {
             path.set_absolute(true);
         }
 
+        validate_schemeless_path(scheme.as_ref(), authority.as_ref(), &path)?;
+
         let (query, value) = if value.starts_with(b"?") {
             let (query, value) = parse_query(&value[1..])?;
             (Some(query), value)
@@ -1209,7 +1211,7 @@ impl<'uri> URIReferenceBuilder<'uri> {
     ///
     /// # Examples
     ///
-    /// Second error type (path not specified):
+    /// First error type (path not specified):
     ///
     /// ```
     /// use uriparse::URIReferenceBuilder;
@@ -1896,5 +1898,13 @@ mod test {
         )
         .unwrap();
         assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn test_parse_uri_reference_error() {
+        assert_eq!(
+            URIReference::try_from("://www.example.com/"),
+            Err(URIReferenceError::SchemelessPathStartsWithColonSegment)
+        );
     }
 }
