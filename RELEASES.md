@@ -1,3 +1,9 @@
+# 0.6.4
+
+ - Added `URI::to_borrowed`, `URIReference::to_borrowed`, and `RelativeReference::to_borrowed`.
+ - Updated dependencies.
+ - Bug fixes.
+
 # 0.6.3
 
  - Add serde support behind feature - @chipsenkbeil.
