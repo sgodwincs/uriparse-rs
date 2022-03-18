@@ -1034,6 +1034,26 @@ impl<'uri> URIReference<'uri> {
         Ok(self.scheme())
     }
 
+    /// Returns a new URI reference which is identical but has a lifetime tied to this URI
+    /// reference.
+    ///
+    /// This function will perform a memory allocation.
+    pub fn to_borrowed(&self) -> URIReference {
+        let scheme = self.scheme.as_ref().map(Scheme::as_borrowed);
+        let authority = self.authority.as_ref().map(Authority::as_borrowed);
+        let path = self.path.to_borrowed();
+        let query = self.query.as_ref().map(Query::as_borrowed);
+        let fragment = self.fragment.as_ref().map(Fragment::as_borrowed);
+
+        URIReference {
+            authority,
+            fragment,
+            path,
+            query,
+            scheme,
+        }
+    }
+
     /// Returns the username, if present, of the URI reference.
     ///
     /// # Examples

@@ -863,6 +863,15 @@ impl<'uri> URI<'uri> {
         Ok(self.scheme())
     }
 
+    /// Returns a new URI which is identical but has a lifetime tied to this URI.
+    ///
+    /// This function will perform a memory allocation.
+    pub fn to_borrowed(&self) -> URI {
+        URI {
+            uri_reference: self.uri_reference.to_borrowed(),
+        }
+    }
+
     /// Returns the username, if present, of the URI.
     ///
     /// # Examples

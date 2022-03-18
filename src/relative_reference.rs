@@ -713,6 +713,16 @@ impl<'uri> RelativeReference<'uri> {
             .map_err(|error| RelativeReferenceError::try_from(error).unwrap())
     }
 
+    /// Returns a new relative reference which is identical but has a lifetime tied to this relative
+    /// reference.
+    ///
+    /// This function will perform a memory allocation.
+    pub fn to_borrowed(&self) -> RelativeReference {
+        RelativeReference {
+            uri_reference: self.uri_reference.to_borrowed(),
+        }
+    }
+
     /// Returns the username, if present, of the relative reference.
     ///
     /// # Examples
