@@ -2,7 +2,6 @@
 //!
 //! See [[RFC3986, Section 3.3](https://tools.ietf.org/html/rfc3986#section-3.3)].
 
-use std::borrow::Cow;
 use std::convert::{Infallible, TryFrom};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter, Write};
@@ -10,6 +9,9 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::str;
 
+use smol_str::SmolStr;
+
+use crate::smol_str_cow::SmolStrCow;
 use crate::utility::{
     get_percent_encoded_value, normalize_string, percent_encoded_equality, percent_encoded_hash,
     UNRESERVED_CHAR_MAP,
@@ -729,22 +731,15 @@ pub struct Segment<'segment> {
     normalized: bool,
 
     /// The internal segment source that is either owned or borrowed.
-    segment: Cow<'segment, str>,
+    segment: SmolStrCow<'segment>,
 }
 
 impl Segment<'_> {
     /// Returns a new segment which is identical but has as lifetime tied to this segment.
     pub fn as_borrowed(&self) -> Segment {
-        use self::Cow::*;
-
-        let segment = match &self.segment {
-            Borrowed(borrowed) => *borrowed,
-            Owned(owned) => owned.as_str(),
-        };
-
         Segment {
             normalized: self.normalized,
-            segment: Cow::Borrowed(segment),
+            segment: SmolStrCow::Borrowed(self.segment.deref()),
         }
     }
 
@@ -776,7 +771,7 @@ impl Segment<'_> {
     pub fn empty() -> Segment<'static> {
         Segment {
             normalized: true,
-            segment: Cow::from(""),
+            segment: SmolStrCow::Borrowed(""),
         }
     }
 
@@ -791,7 +786,7 @@ impl Segment<'_> {
     pub fn into_owned(self) -> Segment<'static> {
         Segment {
             normalized: self.normalized,
-            segment: Cow::from(self.segment.into_owned()),
+            segment: SmolStrCow::Owned(self.segment.into_owned()),
         }
     }
 
@@ -911,7 +906,10 @@ impl Segment<'_> {
     pub fn normalize(&mut self) {
         if !self.normalized {
             // Unsafe: Paths must be valid ASCII-US, so this is safe.
-            unsafe { normalize_string(&mut self.segment.to_mut(), true) };
+            let mut normalized_str = self.segment.to_string();
+            unsafe { normalize_string(&mut normalized_str, true) };
+
+            self.segment = SmolStrCow::Owned(SmolStr::from(&normalized_str));
             self.normalized = true;
         }
     }
@@ -1041,7 +1039,7 @@ impl<'segment> TryFrom<&'segment [u8]> for Segment<'segment> {
         // Unsafe: The loop above makes sure the byte string is valid ASCII-US.
         let segment = Segment {
             normalized,
-            segment: Cow::Borrowed(unsafe { str::from_utf8_unchecked(value) }),
+            segment: SmolStrCow::Borrowed(unsafe { str::from_utf8_unchecked(value) }),
         };
         Ok(segment)
     }
@@ -1142,7 +1140,7 @@ pub(crate) fn parse_path(value: &[u8]) -> Result<(Path, &[u8]), PathError> {
         // Unsafe: The loop above makes sure the byte string is valid ASCII-US.
         Segment {
             normalized: segment_info.normalized,
-            segment: Cow::from(unsafe { str::from_utf8_unchecked(segment) }),
+            segment: SmolStrCow::Borrowed(unsafe { str::from_utf8_unchecked(segment) }),
         }
     }
 

@@ -9,6 +9,8 @@ pub mod scheme;
 pub mod uri;
 pub mod uri_reference;
 
+mod smol_str_cow;
+
 pub use self::authority::{
     Authority, AuthorityError, Host, HostError, Password, PasswordError, PortError, RegisteredName,
     RegisteredNameError, Username, UsernameError,
