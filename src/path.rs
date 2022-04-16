@@ -9,8 +9,6 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::str;
 
-use smol_str::SmolStr;
-
 use crate::smol_str_cow::SmolStrCow;
 use crate::utility::{
     get_percent_encoded_value, normalize_string, percent_encoded_equality, percent_encoded_hash,
@@ -739,7 +737,7 @@ impl Segment<'_> {
     pub fn as_borrowed(&self) -> Segment {
         Segment {
             normalized: self.normalized,
-            segment: SmolStrCow::Borrowed(self.segment.deref()),
+            segment: SmolStrCow::from(self.segment.deref()),
         }
     }
 
@@ -771,7 +769,7 @@ impl Segment<'_> {
     pub fn empty() -> Segment<'static> {
         Segment {
             normalized: true,
-            segment: SmolStrCow::Borrowed(""),
+            segment: SmolStrCow::from(""),
         }
     }
 
@@ -786,7 +784,7 @@ impl Segment<'_> {
     pub fn into_owned(self) -> Segment<'static> {
         Segment {
             normalized: self.normalized,
-            segment: SmolStrCow::Owned(self.segment.into_owned()),
+            segment: SmolStrCow::from(self.segment.into_owned()),
         }
     }
 
@@ -906,10 +904,10 @@ impl Segment<'_> {
     pub fn normalize(&mut self) {
         if !self.normalized {
             // Unsafe: Paths must be valid ASCII-US, so this is safe.
-            let mut normalized_str = self.segment.to_string();
-            unsafe { normalize_string(&mut normalized_str, true) };
+            let mut normalized_segment = self.segment.to_string();
+            unsafe { normalize_string(&mut normalized_segment, true) };
 
-            self.segment = SmolStrCow::Owned(SmolStr::from(&normalized_str));
+            self.segment = SmolStrCow::from(normalized_segment);
             self.normalized = true;
         }
     }

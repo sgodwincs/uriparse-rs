@@ -8,14 +8,15 @@
 
 use fnv::FnvBuildHasher;
 use lazy_static::lazy_static;
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::convert::{Infallible, TryFrom};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 use std::hash::{Hash, Hasher};
+use std::ops::Deref;
 use std::str;
 
+use crate::smol_str_cow::SmolStrCow;
 use crate::utility::normalize_string;
 
 /// The length of the longest currently registered scheme. This is used internally for parsing. Make
@@ -179,7 +180,7 @@ macro_rules! schemes {
                 let scheme = unsafe { str::from_utf8_unchecked(value) };
                 Scheme::Unregistered(UnregisteredScheme{
                     normalized,
-                    scheme:Cow::from(scheme)
+                    scheme: $crate::smol_str_cow::SmolStrCow::from(scheme)
                 })
             }
 
@@ -390,23 +391,16 @@ pub struct UnregisteredScheme<'scheme> {
     normalized: bool,
 
     /// The internal scheme source that is either owned or borrowed.
-    scheme: Cow<'scheme, str>,
+    scheme: SmolStrCow<'scheme>,
 }
 
 impl UnregisteredScheme<'_> {
     /// Returns a new unregistered scheme which is identical but has a lifetime tied to this
     /// unregistered scheme.
     pub fn as_borrowed(&self) -> UnregisteredScheme {
-        use self::Cow::*;
-
-        let scheme = match &self.scheme {
-            Borrowed(borrowed) => *borrowed,
-            Owned(owned) => owned.as_str(),
-        };
-
         UnregisteredScheme {
             normalized: self.normalized,
-            scheme: Cow::Borrowed(scheme),
+            scheme: SmolStrCow::from(self.scheme.deref()),
         }
     }
 
@@ -439,7 +433,7 @@ impl UnregisteredScheme<'_> {
     pub fn into_owned(self) -> UnregisteredScheme<'static> {
         UnregisteredScheme {
             normalized: self.normalized,
-            scheme: Cow::from(self.scheme.into_owned()),
+            scheme: SmolStrCow::from(self.scheme.into_owned()),
         }
     }
 
@@ -486,9 +480,11 @@ impl UnregisteredScheme<'_> {
     /// assert_eq!(scheme, "myscheme");
     /// ```
     pub fn normalize(&mut self) {
+        let mut normalized_scheme = self.scheme.to_string();
         if !self.normalized {
             // Unsafe: Schemes must be valid ASCII-US, so this is safe.
-            unsafe { normalize_string(&mut self.scheme.to_mut(), true) };
+            unsafe { normalize_string(&mut normalized_scheme, true) };
+            self.scheme = SmolStrCow::from(normalized_scheme);
             self.normalized = true;
         }
     }

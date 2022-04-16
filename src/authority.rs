@@ -22,7 +22,6 @@
 //! comes down to it just being too expensive to do a proper host comparison. To do so would require
 //! conversion to [`IpAddr`], which in the case of [`Ipv6Addr`] can be expensive.
 
-use std::borrow::Cow;
 use std::convert::{Infallible, TryFrom};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter, Write};
@@ -32,6 +31,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::ops::Deref;
 use std::str;
 
+use crate::smol_str_cow::SmolStrCow;
 use crate::utility::{
     get_percent_encoded_value, normalize_string, percent_encoded_equality, percent_encoded_hash,
     UNRESERVED_CHAR_MAP,
@@ -394,7 +394,7 @@ impl<'authority> Authority<'authority> {
     {
         let temp_host = Host::RegisteredName(RegisteredName {
             normalized: true,
-            registered_name: Cow::from(""),
+            registered_name: SmolStrCow::from(""),
         });
         let host = mapper(mem::replace(&mut self.host, temp_host));
         self.set_host(host)
@@ -601,7 +601,7 @@ impl<'authority> Authority<'authority> {
                 if self.username.is_none() {
                     self.username = Some(Username {
                         normalized: true,
-                        username: Cow::from(""),
+                        username: SmolStrCow::from(""),
                     });
                 }
 
@@ -984,7 +984,7 @@ impl<'host> TryFrom<&'host [u8]> for Host<'host> {
         if value.is_empty() {
             let registered_name = RegisteredName {
                 normalized: true,
-                registered_name: Cow::from(""),
+                registered_name: SmolStrCow::from(""),
             };
             return Ok(Host::RegisteredName(registered_name));
         }
@@ -1034,7 +1034,7 @@ impl<'host> TryFrom<&'host [u8]> for Host<'host> {
                         Ok(ipv4) => Ok(Host::IPv4Address(ipv4)),
                         Err(_) => Ok(Host::RegisteredName(RegisteredName {
                             normalized,
-                            registered_name: Cow::from(value_string),
+                            registered_name: SmolStrCow::Borrowed(value_string),
                         })),
                     }
                 } else {
@@ -1073,22 +1073,16 @@ pub struct Password<'password> {
     normalized: bool,
 
     /// The internal password source that is either owned or borrowed.
-    password: Cow<'password, str>,
+    password: SmolStrCow<'password>,
 }
 
 impl Password<'_> {
     /// Returns a new password which is identical but has a lifetime tied to this password.
     pub fn as_borrowed(&self) -> Password {
-        use self::Cow::*;
-
-        let password = match &self.password {
-            Borrowed(borrowed) => *borrowed,
-            Owned(owned) => owned.as_str(),
-        };
 
         Password {
             normalized: self.normalized,
-            password: Cow::Borrowed(password),
+            password: SmolStrCow::from(self.password.deref()),
         }
     }
 
@@ -1119,7 +1113,7 @@ impl Password<'_> {
     pub fn into_owned(self) -> Password<'static> {
         Password {
             normalized: self.normalized,
-            password: Cow::from(self.password.into_owned()),
+            password: SmolStrCow::from(self.password.into_owned()),
         }
     }
 
@@ -1173,9 +1167,11 @@ impl Password<'_> {
     /// assert_eq!(password, "%FFA");
     /// ```
     pub fn normalize(&mut self) {
+        let mut normalized_password = self.password.to_string();
         if !self.normalized {
             // Unsafe: Passwords must be valid ASCII-US, so this is safe.
-            unsafe { normalize_string(&mut self.password.to_mut(), true) };
+            unsafe { normalize_string(&mut normalized_password, true) };
+            self.password = SmolStrCow::from(normalized_password);
             self.normalized = true;
         }
     }
@@ -1287,7 +1283,7 @@ impl<'password> TryFrom<&'password [u8]> for Password<'password> {
         // Unsafe: The function above [`check_user_info`] ensures this is valid ASCII-US.
         Ok(Password {
             normalized,
-            password: Cow::from(unsafe { str::from_utf8_unchecked(value) }),
+            password: SmolStrCow::from(unsafe { str::from_utf8_unchecked(value) }),
         })
     }
 }
@@ -1318,23 +1314,16 @@ pub struct RegisteredName<'name> {
     normalized: bool,
 
     /// The internal registered name source that is either owned or borrowed.
-    registered_name: Cow<'name, str>,
+    registered_name: SmolStrCow<'name>,
 }
 
 impl RegisteredName<'_> {
     /// Returns a new registered name which is identical but has a lifetime tied to this registered
     /// name.
     pub fn as_borrowed(&self) -> RegisteredName {
-        use self::Cow::*;
-
-        let name = match &self.registered_name {
-            Borrowed(borrowed) => *borrowed,
-            Owned(owned) => owned.as_str(),
-        };
-
         RegisteredName {
             normalized: self.normalized,
-            registered_name: Cow::Borrowed(name),
+            registered_name: SmolStrCow::Borrowed(self.registered_name.deref()),
         }
     }
 
@@ -1365,7 +1354,7 @@ impl RegisteredName<'_> {
     pub fn into_owned(self) -> RegisteredName<'static> {
         RegisteredName {
             normalized: self.normalized,
-            registered_name: Cow::from(self.registered_name.into_owned()),
+            registered_name: SmolStrCow::from(self.registered_name.into_owned()),
         }
     }
 
@@ -1422,9 +1411,11 @@ impl RegisteredName<'_> {
     /// assert_eq!(name.to_string(), "%FFA");
     /// ```
     pub fn normalize(&mut self) {
+        let mut normalized_registered_name = self.registered_name.to_string();
         if !self.normalized {
             // Unsafe: Registered names must be valid ASCII-US, so this is safe.
-            unsafe { normalize_string(&mut self.registered_name.to_mut(), false) };
+            unsafe { normalize_string(&mut normalized_registered_name, false) };
+            self.registered_name = SmolStrCow::from(normalized_registered_name);
             self.normalized = true;
         }
     }
@@ -1563,22 +1554,16 @@ pub struct Username<'username> {
     normalized: bool,
 
     /// The internal username source that is either owned or borrowed.
-    username: Cow<'username, str>,
+    username: SmolStrCow<'username>,
 }
 
 impl Username<'_> {
     /// Returns a new username which is identical but has a lifetime tied to this username.
     pub fn as_borrowed(&self) -> Username {
-        use self::Cow::*;
-
-        let username = match &self.username {
-            Borrowed(borrowed) => *borrowed,
-            Owned(owned) => owned.as_str(),
-        };
 
         Username {
             normalized: self.normalized,
-            username: Cow::Borrowed(username),
+            username: SmolStrCow::Borrowed(self.username.deref()),
         }
     }
 
@@ -1609,7 +1594,7 @@ impl Username<'_> {
     pub fn into_owned(self) -> Username<'static> {
         Username {
             normalized: self.normalized,
-            username: Cow::from(self.username.into_owned()),
+            username: SmolStrCow::from(self.username.into_owned()),
         }
     }
 
@@ -1663,9 +1648,11 @@ impl Username<'_> {
     /// assert_eq!(username, "%FFA");
     /// ```
     pub fn normalize(&mut self) {
+        let mut normalized_username = self.username.to_string();
         if !self.normalized {
             // Unsafe: Usernames must be valid ASCII-US, so this is safe.
-            unsafe { normalize_string(&mut self.username.to_mut(), true) };
+            unsafe { normalize_string(&mut normalized_username, true) };
+            self.username = SmolStrCow::from(normalized_username);
             self.normalized = true;
         }
     }
@@ -1777,7 +1764,7 @@ impl<'username> TryFrom<&'username [u8]> for Username<'username> {
         // Unsafe: The function above [`check_user_info`] ensure this is valid ASCII-US.
         Ok(Username {
             normalized,
-            username: Cow::from(unsafe { str::from_utf8_unchecked(value) }),
+            username: SmolStrCow::from(unsafe { str::from_utf8_unchecked(value) }),
         })
     }
 }
@@ -2295,18 +2282,18 @@ fn parse_user_info(value: &[u8]) -> Result<(Username, Option<Password>), UserInf
         Some(index) => {
             let username = Username {
                 normalized: username_normalized,
-                username: Cow::from(unsafe { str::from_utf8_unchecked(&value[..index]) }),
+                username: SmolStrCow::from(unsafe { str::from_utf8_unchecked(&value[..index]) }),
             };
             let password = Password {
                 normalized: password_normalized,
-                password: Cow::from(unsafe { str::from_utf8_unchecked(&value[index + 1..]) }),
+                password: SmolStrCow::from(unsafe { str::from_utf8_unchecked(&value[index + 1..]) }),
             };
             (username, Some(password))
         }
         _ => {
             let username = Username {
                 normalized: username_normalized,
-                username: Cow::from(unsafe { str::from_utf8_unchecked(value) }),
+                username: SmolStrCow::from(unsafe { str::from_utf8_unchecked(value) }),
             };
             (username, None)
         }

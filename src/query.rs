@@ -6,7 +6,6 @@
 //! string as defined by the RFC. You will need to use another crate (e.g.
 //! [queryst](https://github.com/rustless/queryst)) if you want it parsed.
 
-use std::borrow::Cow;
 use std::convert::{Infallible, TryFrom};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
@@ -14,6 +13,7 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::str;
 
+use crate::smol_str_cow::SmolStrCow;
 use crate::utility::{
     get_percent_encoded_value, normalize_string, percent_encoded_equality, percent_encoded_hash,
     UNRESERVED_CHAR_MAP,
@@ -58,22 +58,15 @@ pub struct Query<'query> {
     normalized: bool,
 
     /// The internal query source that is either owned or borrowed.
-    query: Cow<'query, str>,
+    query: SmolStrCow<'query>,
 }
 
 impl Query<'_> {
     /// Returns a new query which is identical but has a lifetime tied to this query.
     pub fn as_borrowed(&self) -> Query {
-        use self::Cow::*;
-
-        let query = match &self.query {
-            Borrowed(borrowed) => *borrowed,
-            Owned(owned) => owned.as_str(),
-        };
-
         Query {
             normalized: self.normalized,
-            query: Cow::Borrowed(query),
+            query: SmolStrCow::from(self.query.deref()),
         }
     }
 
@@ -104,7 +97,7 @@ impl Query<'_> {
     pub fn into_owned(self) -> Query<'static> {
         Query {
             normalized: self.normalized,
-            query: Cow::from(self.query.into_owned()),
+            query: SmolStrCow::from(self.query.into_owned()),
         }
     }
 
@@ -158,9 +151,11 @@ impl Query<'_> {
     /// assert_eq!(query, "%FFA");
     /// ```
     pub fn normalize(&mut self) {
+        let mut normalized_query = self.query.to_string();
         if !self.normalized {
             // Unsafe: Queries must be valid ASCII-US, so this is safe.
-            unsafe { normalize_string(&mut self.query.to_mut(), true) };
+            unsafe { normalize_string(&mut normalized_query, true) };
+            self.query = SmolStrCow::from(normalized_query);
             self.normalized = true;
         }
     }
@@ -344,7 +339,7 @@ pub(crate) fn parse_query(value: &[u8]) -> Result<(Query, &[u8]), QueryError> {
     // Unsafe: The loop above makes sure the byte string is valid ASCII-US.
     let query = Query {
         normalized,
-        query: Cow::from(unsafe { str::from_utf8_unchecked(value) }),
+        query: SmolStrCow::from(unsafe { str::from_utf8_unchecked(value) }),
     };
     Ok((query, rest))
 }

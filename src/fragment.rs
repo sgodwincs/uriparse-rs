@@ -2,7 +2,6 @@
 //!
 //! See [[RFC3986, Section 3.5](https://tools.ietf.org/html/rfc3986#section-3.5)].
 
-use std::borrow::Cow;
 use std::convert::{Infallible, TryFrom};
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
@@ -10,6 +9,7 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::str;
 
+use crate::smol_str_cow::SmolStrCow;
 use crate::utility::{
     get_percent_encoded_value, normalize_string, percent_encoded_equality, percent_encoded_hash,
     UNRESERVED_CHAR_MAP,
@@ -51,7 +51,7 @@ const FRAGMENT_CHAR_MAP: [u8; 256] = [
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Fragment<'fragment> {
     /// The internal fragment source that is either owned or borrowed.
-    fragment: Cow<'fragment, str>,
+    fragment: SmolStrCow<'fragment>,
 
     /// Whether the fragment is normalized.
     normalized: bool,
@@ -60,15 +60,8 @@ pub struct Fragment<'fragment> {
 impl Fragment<'_> {
     /// Returns a new fragment which is identical but has a lifetime tied to this fragment.
     pub fn as_borrowed(&self) -> Fragment {
-        use self::Cow::*;
-
-        let fragment = match &self.fragment {
-            Borrowed(borrowed) => *borrowed,
-            Owned(owned) => owned.as_str(),
-        };
-
         Fragment {
-            fragment: Cow::Borrowed(fragment),
+            fragment: SmolStrCow::from(self.fragment.deref()),
             normalized: self.normalized,
         }
     }
@@ -99,7 +92,7 @@ impl Fragment<'_> {
     /// thus the lifetime will remain the same.
     pub fn into_owned(self) -> Fragment<'static> {
         Fragment {
-            fragment: Cow::from(self.fragment.into_owned()),
+            fragment: SmolStrCow::from(self.fragment.into_owned()),
             normalized: self.normalized,
         }
     }
@@ -154,9 +147,11 @@ impl Fragment<'_> {
     /// assert_eq!(fragment, "%FFA");
     /// ```
     pub fn normalize(&mut self) {
+        let mut normalized_fragment = self.fragment.to_string();
         if !self.normalized {
             // Unsafe: Fragments must be valid ASCII-US, so this is safe.
-            unsafe { normalize_string(&mut self.fragment.to_mut(), true) };
+            unsafe { normalize_string(&mut normalized_fragment, true) };
+            self.fragment = SmolStrCow::from(normalized_fragment);
             self.normalized = true;
         }
     }
@@ -285,7 +280,7 @@ impl<'fragment> TryFrom<&'fragment [u8]> for Fragment<'fragment> {
 
         // Unsafe: The loop above makes sure the byte string is valid ASCII-US.
         Ok(Fragment {
-            fragment: Cow::from(unsafe { str::from_utf8_unchecked(value) }),
+            fragment: SmolStrCow::from(unsafe { str::from_utf8_unchecked(value) }),
             normalized,
         })
     }

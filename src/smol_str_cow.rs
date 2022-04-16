@@ -23,6 +23,27 @@ impl<'s> Deref for SmolStrCow<'s> {
     }
 }
 
+impl<'s> From<&'s str> for SmolStrCow<'s> {
+    #[inline]
+    fn from(v: &'s str) -> Self {
+        Self::Borrowed(v)
+    }
+}
+
+impl From<String> for SmolStrCow<'static> {
+    #[inline]
+    fn from(v: String) -> Self {
+        Self::Owned(SmolStr::from(&v))
+    }
+}
+
+impl From<SmolStr> for SmolStrCow<'static> {
+    #[inline]
+    fn from(v: SmolStr) -> Self {
+        Self::Owned(v)
+    }
+}
+
 impl<'s> SmolStrCow<'s> {
     /// Clone the data into an owned-type.
     #[inline]
