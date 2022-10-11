@@ -1021,8 +1021,12 @@ impl<'host> TryFrom<&'host [u8]> for Host<'host> {
                 let zone = split_for_zone.next()
                     .unwrap_or(b"");
 
-                if !check_ipv6(ipv6) || !check_zone(zone) {
+                if !check_ipv6(ipv6) {
                     return Err(HostError::InvalidIPv6Character);
+                }
+
+                if !check_zone(zone) {
+                    return Err(HostError::InvalidZoneCharacter);
                 }
 
                 // Unsafe: The function above [`check_ipv6`] ensures this is valid ASCII-US.
@@ -1935,6 +1939,10 @@ pub enum HostError {
     /// character.
     InvalidIPv6Character,
 
+    /// The zone identifier (inside an IPv6 address after the `%`) contained characters other than
+    /// the allowed (which are the "unreserved" set).
+    InvalidZoneCharacter,
+
     /// The syntax for an IPv6 literal was used (i.e. `"[...]"`) and all of the characters were
     /// valid IPv6 characters. However, the format of the literal was invalid.
     InvalidIPv6Format,
@@ -1957,6 +1965,7 @@ impl Display for HostError {
             }
             InvalidIPv6Character => write!(formatter, "invalid host IPv6 character"),
             InvalidIPv6Format => write!(formatter, "invalid host IPv6 format"),
+            InvalidZoneCharacter => write!(formatter, "invalid character in zone ID"),
             InvalidIPvFutureCharacter => write!(formatter, "invalid host IPvFuture character"),
         }
     }
