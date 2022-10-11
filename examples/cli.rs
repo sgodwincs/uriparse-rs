@@ -13,5 +13,13 @@ fn main() {
     for uri in args {
         let parsed = uriparse::URIReference::try_from(uri.as_str());
         println!("<{}>: {:#?}", uri, parsed);
+
+        if let Ok(parsed) = parsed {
+            let reconstructed = format!("{}", parsed);
+            if reconstructed != uri {
+                println!("Warning: URI doesn't round-trip -- serializes into:");
+                println!("<{}>", reconstructed);
+            }
+        }
     }
 }
