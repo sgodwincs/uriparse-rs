@@ -134,7 +134,7 @@ impl<'authority> Authority<'authority> {
         let host = match &self.host {
             Host::RegisteredName(name) => Host::RegisteredName(name.as_borrowed()),
             Host::IPv4Address(ipv4) => Host::IPv4Address(*ipv4),
-            Host::IPv6Address(ipv6, zone) => Host::IPv6Address(*ipv6, zone.as_borrowed()),
+            Host::IPv6Address(ipv6, zone) => Host::IPv6Address(*ipv6, zone.as_ref().map(|z| z.as_borrowed())),
         };
         let password = self.password.as_ref().map(Password::as_borrowed);
         let username = self.username.as_ref().map(Username::as_borrowed);
@@ -299,7 +299,7 @@ impl<'authority> Authority<'authority> {
         let host = match self.host {
             Host::RegisteredName(name) => Host::RegisteredName(name.into_owned()),
             Host::IPv4Address(ipv4) => Host::IPv4Address(ipv4),
-            Host::IPv6Address(ipv6, zone) => Host::IPv6Address(ipv6, zone.into_owned()),
+            Host::IPv6Address(ipv6, zone) => Host::IPv6Address(ipv6, zone.map(|z| z.into_owned())),
         };
 
         Authority {
@@ -773,7 +773,7 @@ pub enum Host<'host> {
     IPv4Address(Ipv4Addr),
 
     /// An IPv6 address. This will always be encased in brackets (`'['` and `']'`).
-    IPv6Address(Ipv6Addr, ZoneID<'host>),
+    IPv6Address(Ipv6Addr, Option<ZoneID<'host>>),
 
     /// Any other host that does not follow the syntax of an IP address. This includes even hosts of
     /// the form `"999.999.999.999"`. One might expect this to produce an invalid IPv4 error, but
@@ -791,7 +791,7 @@ impl Host<'_> {
 
         match self {
             IPv4Address(ipv4) => IPv4Address(*ipv4),
-            IPv6Address(ipv6, zone) => IPv6Address(*ipv6, zone.as_borrowed()),
+            IPv6Address(ipv6, zone) => IPv6Address(*ipv6, zone.as_ref().map(|z| z.as_borrowed())),
             RegisteredName(name) => RegisteredName(name.as_borrowed()),
         }
     }
@@ -809,7 +809,7 @@ impl Host<'_> {
 
         match self {
             IPv4Address(ipv4) => IPv4Address(ipv4),
-            IPv6Address(ipv6, zone) => IPv6Address(ipv6, zone.into_owned()),
+            IPv6Address(ipv6, zone) => IPv6Address(ipv6, zone.map(|z| z.into_owned())),
             RegisteredName(name) => RegisteredName(name.into_owned()),
         }
     }
@@ -943,7 +943,7 @@ impl Display for Host<'_> {
             IPv6Address(address, zone) => {
                 formatter.write_char('[')?;
                 address.fmt(formatter)?;
-                if !zone.as_str().is_empty() {
+                if let Some(zone) = zone {
                     formatter.write_char('%')?;
                     formatter.write_str(zone.as_str())?;
                 }
@@ -977,7 +977,7 @@ impl From<Ipv4Addr> for Host<'static> {
 
 impl From<Ipv6Addr> for Host<'static> {
     fn from(value: Ipv6Addr) -> Self {
-        Host::IPv6Address(value, ZoneID { value: Cow::from("") })
+        Host::IPv6Address(value, None)
     }
 }
 
@@ -1018,24 +1018,17 @@ impl<'host> TryFrom<&'host [u8]> for Host<'host> {
                 let mut split_for_zone = ipv6.splitn(2, |c| c == &b'%');
                 let ipv6 = split_for_zone.next()
                     .expect("Even an empty string splits into at least one component");
-                let zone = split_for_zone.next()
-                    .unwrap_or(b"");
+                let zone = split_for_zone.next();
 
                 if !check_ipv6(ipv6) {
                     return Err(HostError::InvalidIPv6Character);
-                }
-
-                if !check_zone(zone) {
-                    return Err(HostError::InvalidZoneCharacter);
                 }
 
                 // Unsafe: The function above [`check_ipv6`] ensures this is valid ASCII-US.
                 let ipv6: Ipv6Addr = unsafe { str::from_utf8_unchecked(ipv6) }
                     .parse()
                     .map_err(|_| HostError::InvalidIPv6Format)?;
-                // Unsafe: As above
-                let zone = unsafe { str::from_utf8_unchecked(zone) };
-                Ok(Host::IPv6Address(ipv6, ZoneID { value: Cow::from(zone) }))
+                Ok(Host::IPv6Address(ipv6, ZoneID::new(zone)?))
             }
             _ => {
                 let (valid, normalized) = check_ipv4_or_registered_name(value);
@@ -1326,6 +1319,20 @@ pub struct ZoneID<'zone> {
 }
 
 impl ZoneID<'_> {
+    fn new<'a>(value: Option<&'a [u8]>) -> Result<Option<ZoneID<'a>>, HostError> {
+        if let Some(value) = value {
+            if value.is_empty() || !check_zone(value) {
+                return Err(HostError::InvalidZoneCharacter);
+            }
+
+            // Unsafe: character set was just checked way stricter than a UTF-8 check
+            let value = unsafe { str::from_utf8_unchecked(value) };
+            Ok(Some(ZoneID { value: Cow::from(value) }))
+        } else {
+            Ok(None)
+        }
+    }
+
     /// Returns a new zone ID which is identical but has a lifetime tied to this zone ID name.
     pub fn as_borrowed(&self) -> ZoneID {
         use self::Cow::*;
