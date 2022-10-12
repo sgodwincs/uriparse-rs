@@ -2,7 +2,7 @@
 authors = ["Scott Godwin <sgodwincs@gmail.com>"]
 categories = ["parsing"]
 description = "A URI parser including relative references"
-edition = "2018"
+edition = "2021"
 homepage = "https://github.com/sgodwincs/uriparse-rs"
 license = "MIT"
 name = "uriparse"
